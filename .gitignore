@@ -216,3 +216,9 @@ __marimo__/
 
 # Streamlit
 .streamlit/secrets.toml
+
+# Energy Flex Trust local state
+*.db
+*.db-journal
+*.sqlite
+*.sqlite3
