@@ -7,7 +7,6 @@ import json
 from pathlib import Path
 from typing import Any
 
-
 DATA_PATH = Path(__file__).with_name("demo_data") / "operations_scenarios.json"
 DISPOSITIONS = {"normal", "review", "block"}
 CONTROL_STATUSES = {"pass", "warn", "fail"}
