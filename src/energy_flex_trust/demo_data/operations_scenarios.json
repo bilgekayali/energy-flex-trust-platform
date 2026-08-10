@@ -1,0 +1,474 @@
+{
+  "schema_version": "0.1.0",
+  "synthetic_data": true,
+  "scenarios": [
+    {
+      "name": "Healthy coordination",
+      "description": "All material commands are idempotent, meter evidence is complete, and the audit chain verifies.",
+      "disposition": "normal",
+      "as_of": "2026-08-10T18:45:00Z",
+      "currency": "GBP",
+      "assets": [
+        {
+          "asset_id": "BAT-GB-LON-01",
+          "asset_type": "Battery",
+          "location": "GB-LON",
+          "capacity_kw": 120,
+          "offered_kw": 90,
+          "reserved_kw": 70,
+          "dispatched_kw": 60,
+          "delivered_kwh": 58.4,
+          "status": "active"
+        },
+        {
+          "asset_id": "EV-GB-LON-14",
+          "asset_type": "EV charger fleet",
+          "location": "GB-LON",
+          "capacity_kw": 80,
+          "offered_kw": 50,
+          "reserved_kw": 40,
+          "dispatched_kw": 35,
+          "delivered_kwh": 34.2,
+          "status": "active"
+        },
+        {
+          "asset_id": "HP-GB-MAN-07",
+          "asset_type": "Heat pump fleet",
+          "location": "GB-MAN",
+          "capacity_kw": 45,
+          "offered_kw": 30,
+          "reserved_kw": 0,
+          "dispatched_kw": 0,
+          "delivered_kwh": 0,
+          "status": "active"
+        },
+        {
+          "asset_id": "IND-GB-BHM-03",
+          "asset_type": "Industrial load",
+          "location": "GB-BHM",
+          "capacity_kw": 200,
+          "offered_kw": 120,
+          "reserved_kw": 100,
+          "dispatched_kw": 90,
+          "delivered_kwh": 88,
+          "status": "active"
+        }
+      ],
+      "controls": [
+        {
+          "name": "Audit chain",
+          "status": "pass",
+          "evidence": "12 hash-linked events verified"
+        },
+        {
+          "name": "Idempotency",
+          "status": "pass",
+          "evidence": "No conflicting replay keys"
+        },
+        {
+          "name": "Separation of duties",
+          "status": "pass",
+          "evidence": "Operator and settlement identities differ"
+        },
+        {
+          "name": "Meter evidence",
+          "status": "pass",
+          "evidence": "100% of dispatched intervals covered"
+        }
+      ],
+      "events": [
+        {
+          "time": "18:00",
+          "event": "Flexibility offers opened",
+          "actor": "asset owners",
+          "resource": "4 assets",
+          "status": "accepted"
+        },
+        {
+          "time": "18:05",
+          "event": "Capacity reserved",
+          "actor": "operator-001",
+          "resource": "210 kW",
+          "status": "accepted"
+        },
+        {
+          "time": "18:15",
+          "event": "Dispatch issued",
+          "actor": "operator-001",
+          "resource": "185 kW",
+          "status": "accepted"
+        },
+        {
+          "time": "18:40",
+          "event": "Meter evidence reconciled",
+          "actor": "system-meter",
+          "resource": "3 intervals",
+          "status": "verified"
+        },
+        {
+          "time": "18:45",
+          "event": "Settlement evidence prepared",
+          "actor": "analyst-002",
+          "resource": "£90.30",
+          "status": "ready"
+        }
+      ],
+      "settlement": {
+        "ready": true,
+        "amount_gbp": 90.3,
+        "evidence_coverage_percent": 100
+      },
+      "audit": {
+        "valid": true,
+        "event_count": 12,
+        "broken_sequence": null
+      },
+      "signals": []
+    },
+    {
+      "name": "Capacity stress",
+      "description": "Reserved capacity is close to the synthetic fleet limit and delivery variance requires operator review.",
+      "disposition": "review",
+      "as_of": "2026-08-10T19:20:00Z",
+      "currency": "GBP",
+      "assets": [
+        {
+          "asset_id": "BAT-GB-LON-01",
+          "asset_type": "Battery",
+          "location": "GB-LON",
+          "capacity_kw": 120,
+          "offered_kw": 120,
+          "reserved_kw": 116,
+          "dispatched_kw": 110,
+          "delivered_kwh": 102,
+          "status": "active"
+        },
+        {
+          "asset_id": "EV-GB-LON-14",
+          "asset_type": "EV charger fleet",
+          "location": "GB-LON",
+          "capacity_kw": 80,
+          "offered_kw": 78,
+          "reserved_kw": 74,
+          "dispatched_kw": 70,
+          "delivered_kwh": 61,
+          "status": "active"
+        },
+        {
+          "asset_id": "HP-GB-MAN-07",
+          "asset_type": "Heat pump fleet",
+          "location": "GB-MAN",
+          "capacity_kw": 45,
+          "offered_kw": 42,
+          "reserved_kw": 40,
+          "dispatched_kw": 38,
+          "delivered_kwh": 36,
+          "status": "active"
+        },
+        {
+          "asset_id": "IND-GB-BHM-03",
+          "asset_type": "Industrial load",
+          "location": "GB-BHM",
+          "capacity_kw": 200,
+          "offered_kw": 190,
+          "reserved_kw": 180,
+          "dispatched_kw": 170,
+          "delivered_kwh": 164,
+          "status": "active"
+        }
+      ],
+      "controls": [
+        {
+          "name": "Audit chain",
+          "status": "pass",
+          "evidence": "18 hash-linked events verified"
+        },
+        {
+          "name": "Idempotency",
+          "status": "pass",
+          "evidence": "Repeated dispatch key returned the original resource"
+        },
+        {
+          "name": "Capacity headroom",
+          "status": "warn",
+          "evidence": "Only 35 kW remains unreserved"
+        },
+        {
+          "name": "Delivery variance",
+          "status": "warn",
+          "evidence": "EV fleet delivered 12.9% below dispatch"
+        }
+      ],
+      "events": [
+        {
+          "time": "19:00",
+          "event": "High-demand window opened",
+          "actor": "operator-001",
+          "resource": "445 kW fleet",
+          "status": "observed"
+        },
+        {
+          "time": "19:04",
+          "event": "Capacity reserved",
+          "actor": "operator-001",
+          "resource": "410 kW",
+          "status": "accepted"
+        },
+        {
+          "time": "19:10",
+          "event": "Dispatch issued",
+          "actor": "operator-001",
+          "resource": "388 kW",
+          "status": "accepted"
+        },
+        {
+          "time": "19:18",
+          "event": "Delivery variance detected",
+          "actor": "control-engine",
+          "resource": "EV-GB-LON-14",
+          "status": "review"
+        },
+        {
+          "time": "19:20",
+          "event": "Settlement held for review",
+          "actor": "analyst-002",
+          "resource": "£181.50 estimate",
+          "status": "held"
+        }
+      ],
+      "settlement": {
+        "ready": false,
+        "amount_gbp": 181.5,
+        "evidence_coverage_percent": 100
+      },
+      "audit": {
+        "valid": true,
+        "event_count": 18,
+        "broken_sequence": null
+      },
+      "signals": [
+        {
+          "severity": "medium",
+          "title": "Low capacity headroom",
+          "action": "Keep 35 kW unreserved and require operator review before further dispatch."
+        },
+        {
+          "severity": "high",
+          "title": "Delivery variance above threshold",
+          "action": "Hold settlement and reconcile EV fleet meter evidence."
+        }
+      ]
+    },
+    {
+      "name": "Meter evidence gap",
+      "description": "A dispatch interval lacks complete meter coverage, so settlement remains blocked despite a valid audit chain.",
+      "disposition": "block",
+      "as_of": "2026-08-10T20:15:00Z",
+      "currency": "GBP",
+      "assets": [
+        {
+          "asset_id": "BAT-GB-LON-01",
+          "asset_type": "Battery",
+          "location": "GB-LON",
+          "capacity_kw": 120,
+          "offered_kw": 90,
+          "reserved_kw": 80,
+          "dispatched_kw": 75,
+          "delivered_kwh": 36,
+          "status": "evidence_gap"
+        },
+        {
+          "asset_id": "EV-GB-LON-14",
+          "asset_type": "EV charger fleet",
+          "location": "GB-LON",
+          "capacity_kw": 80,
+          "offered_kw": 50,
+          "reserved_kw": 45,
+          "dispatched_kw": 40,
+          "delivered_kwh": 39,
+          "status": "active"
+        },
+        {
+          "asset_id": "HP-GB-MAN-07",
+          "asset_type": "Heat pump fleet",
+          "location": "GB-MAN",
+          "capacity_kw": 45,
+          "offered_kw": 25,
+          "reserved_kw": 20,
+          "dispatched_kw": 18,
+          "delivered_kwh": 17,
+          "status": "active"
+        }
+      ],
+      "controls": [
+        {
+          "name": "Audit chain",
+          "status": "pass",
+          "evidence": "14 hash-linked events verified"
+        },
+        {
+          "name": "Dispatch authorization",
+          "status": "pass",
+          "evidence": "All dispatches stay within reserved capacity"
+        },
+        {
+          "name": "Meter evidence",
+          "status": "fail",
+          "evidence": "Battery interval coverage is incomplete"
+        },
+        {
+          "name": "Settlement readiness",
+          "status": "fail",
+          "evidence": "Settlement requires complete in-window evidence"
+        }
+      ],
+      "events": [
+        {
+          "time": "20:00",
+          "event": "Dispatch issued",
+          "actor": "operator-003",
+          "resource": "133 kW",
+          "status": "accepted"
+        },
+        {
+          "time": "20:08",
+          "event": "Meter interval expected",
+          "actor": "control-engine",
+          "resource": "BAT-GB-LON-01",
+          "status": "pending"
+        },
+        {
+          "time": "20:12",
+          "event": "Coverage gap detected",
+          "actor": "control-engine",
+          "resource": "20:00–20:10",
+          "status": "failed"
+        },
+        {
+          "time": "20:15",
+          "event": "Settlement blocked",
+          "actor": "analyst-004",
+          "resource": "reservation-set-203",
+          "status": "blocked"
+        }
+      ],
+      "settlement": {
+        "ready": false,
+        "amount_gbp": 0,
+        "evidence_coverage_percent": 66.7
+      },
+      "audit": {
+        "valid": true,
+        "event_count": 14,
+        "broken_sequence": null
+      },
+      "signals": [
+        {
+          "severity": "critical",
+          "title": "Incomplete meter evidence",
+          "action": "Block settlement until the missing interval is independently reconciled."
+        }
+      ]
+    },
+    {
+      "name": "Audit tampering detected",
+      "description": "The hash-linked event stream fails verification, freezing evidence-dependent settlement decisions.",
+      "disposition": "block",
+      "as_of": "2026-08-10T21:05:00Z",
+      "currency": "GBP",
+      "assets": [
+        {
+          "asset_id": "BAT-GB-LON-01",
+          "asset_type": "Battery",
+          "location": "GB-LON",
+          "capacity_kw": 120,
+          "offered_kw": 80,
+          "reserved_kw": 60,
+          "dispatched_kw": 55,
+          "delivered_kwh": 54,
+          "status": "frozen"
+        },
+        {
+          "asset_id": "IND-GB-BHM-03",
+          "asset_type": "Industrial load",
+          "location": "GB-BHM",
+          "capacity_kw": 200,
+          "offered_kw": 100,
+          "reserved_kw": 80,
+          "dispatched_kw": 75,
+          "delivered_kwh": 74,
+          "status": "frozen"
+        }
+      ],
+      "controls": [
+        {
+          "name": "Audit chain",
+          "status": "fail",
+          "evidence": "Sequence 7 does not match its recorded event hash"
+        },
+        {
+          "name": "Idempotency",
+          "status": "pass",
+          "evidence": "Command replay records remain consistent"
+        },
+        {
+          "name": "Meter evidence",
+          "status": "pass",
+          "evidence": "All dispatched intervals are present"
+        },
+        {
+          "name": "Settlement readiness",
+          "status": "fail",
+          "evidence": "Evidence cannot be trusted while the audit chain is invalid"
+        }
+      ],
+      "events": [
+        {
+          "time": "20:40",
+          "event": "Meter evidence recorded",
+          "actor": "system-meter",
+          "resource": "2 intervals",
+          "status": "verified"
+        },
+        {
+          "time": "20:55",
+          "event": "Audit verification started",
+          "actor": "auditor-001",
+          "resource": "event stream",
+          "status": "running"
+        },
+        {
+          "time": "21:00",
+          "event": "Hash mismatch detected",
+          "actor": "audit-verifier",
+          "resource": "sequence 7",
+          "status": "failed"
+        },
+        {
+          "time": "21:05",
+          "event": "Settlement evidence frozen",
+          "actor": "control-engine",
+          "resource": "2 reservations",
+          "status": "blocked"
+        }
+      ],
+      "settlement": {
+        "ready": false,
+        "amount_gbp": 0,
+        "evidence_coverage_percent": 100
+      },
+      "audit": {
+        "valid": false,
+        "event_count": 11,
+        "broken_sequence": 7
+      },
+      "signals": [
+        {
+          "severity": "critical",
+          "title": "Audit-chain integrity failure",
+          "action": "Freeze settlement, preserve the database, and investigate sequence 7."
+        }
+      ]
+    }
+  ]
+}
