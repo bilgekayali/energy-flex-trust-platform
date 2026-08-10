@@ -29,6 +29,9 @@ dependencies = [
 ]
 
 [project.optional-dependencies]
+dashboard = [
+  "gradio>=5,<7",
+]
 dev = [
   "httpx>=0.27,<1",
   "pytest>=8.3,<9",
@@ -38,6 +41,9 @@ dev = [
 
 [tool.setuptools.packages.find]
 where = ["src"]
+
+[tool.setuptools.package-data]
+energy_flex_trust = ["demo_data/*.json"]
 
 [tool.pytest.ini_options]
 addopts = "-q --strict-markers --cov=energy_flex_trust --cov-report=term-missing --cov-fail-under=85"
