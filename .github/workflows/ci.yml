@@ -28,22 +28,48 @@ jobs:
       - name: Compile
         run: python -m compileall -q src tests migrations
       - name: Test
-        run: pytest
-      - name: OIDC verifier network boundary
+        shell: bash
+        run: |
+          set -o pipefail
+          pytest 2>&1 | tee pytest.log
+      - name: Annotate pytest failure
+        if: failure()
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+
+          path = Path("pytest.log")
+          if path.exists():
+              lines = path.read_text(encoding="utf-8", errors="replace").splitlines()
+              text = "\n".join(lines[-120:])
+              text = text.replace("%", "%25")
+              text = text.replace("\r", "%0D").replace("\n", "%0A")
+              print(f"::error title=pytest failure::{text}")
+          PY
+      - name: Trust-boundary network imports
         run: |
           python - <<'PY'
           import ast
           from pathlib import Path
 
-          blocked = {"httpx", "requests", "socket", "urllib"}
-          tree = ast.parse(Path("src/energy_flex_trust/auth.py").read_text())
-          imports = set()
-          for node in ast.walk(tree):
-              if isinstance(node, ast.Import):
-                  imports.update(alias.name.split(".")[0] for alias in node.names)
-              elif isinstance(node, ast.ImportFrom) and node.module:
-                  imports.add(node.module.split(".")[0])
-          forbidden = sorted(imports & blocked)
-          if forbidden:
-              raise SystemExit(f"network-capable imports in auth boundary: {forbidden}")
+          blocked = {"aiohttp", "httpx", "requests", "socket", "urllib"}
+          boundaries = {
+              "OIDC verifier": Path("src/energy_flex_trust/auth.py"),
+              "OpenADR contract": Path("src/energy_flex_trust/openadr.py"),
+          }
+          for name, path in boundaries.items():
+              tree = ast.parse(path.read_text(encoding="utf-8"))
+              imports = set()
+              for node in ast.walk(tree):
+                  if isinstance(node, ast.Import):
+                      imports.update(
+                          alias.name.split(".")[0] for alias in node.names
+                      )
+                  elif isinstance(node, ast.ImportFrom) and node.module:
+                      imports.add(node.module.split(".")[0])
+              forbidden = sorted(imports & blocked)
+              if forbidden:
+                  raise SystemExit(
+                      f"network-capable imports in {name}: {forbidden}"
+                  )
           PY

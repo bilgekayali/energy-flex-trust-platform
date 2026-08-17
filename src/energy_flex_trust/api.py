@@ -11,8 +11,9 @@ from . import __version__
 from .auth import AuthenticationError, OidcVerifierConfig, verify_oidc_actor
 from .config import Settings
 from .database import build_engine, build_session_factory, initialize_database
-from .domain import Actor, ActorRole
+from .domain import Actor, ActorRole, require_role
 from .errors import DomainError
+from .outbox import outbox_snapshot
 from .schemas import (
     AssetCreate,
     AssetRead,
@@ -25,6 +26,7 @@ from .schemas import (
     MeterReadingRead,
     OfferCreate,
     OfferRead,
+    OutboxHealthRead,
     ReservationCreate,
     ReservationRead,
     SettlementRead,
@@ -47,7 +49,8 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         version=__version__,
         description=(
             "Secure reference API for auditable energy-flexibility coordination. "
-            "The default dispatch adapter never contacts a live asset."
+            "Dispatch intents are durably queued; no live transport is wired by "
+            "default."
         ),
     )
     application.state.settings = settings
@@ -241,6 +244,18 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     ) -> AuditVerificationRead:
         result = CoordinationService(session).audit_verification(actor)
         return AuditVerificationRead.model_validate(result)
+
+    @application.get(
+        "/v1/operations/outbox",
+        response_model=OutboxHealthRead,
+        tags=["operations"],
+    )
+    def outbox_health(
+        session: SessionDependency,
+        actor: ActorDependency,
+    ) -> OutboxHealthRead:
+        require_role(actor, ActorRole.AUDITOR, ActorRole.MARKET_OPERATOR)
+        return OutboxHealthRead.model_validate(outbox_snapshot(session))
 
     return application
 
