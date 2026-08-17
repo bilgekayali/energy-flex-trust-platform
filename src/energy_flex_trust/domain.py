@@ -33,12 +33,14 @@ class OfferStatus(StrEnum):
 
 class ReservationStatus(StrEnum):
     RESERVED = "reserved"
+    DISPATCH_PENDING = "dispatch_pending"
     DISPATCHED = "dispatched"
     COMPLETED = "completed"
     CANCELLED = "cancelled"
 
 
 class DispatchStatus(StrEnum):
+    QUEUED = "queued"
     ISSUED = "issued"
     COMPLETED = "completed"
     REJECTED = "rejected"
