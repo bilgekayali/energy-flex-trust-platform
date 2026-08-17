@@ -63,7 +63,9 @@ def authorize_dead_dispatch_redrive(
                 "Outbox message and dispatch identifiers do not match."
             )
         if message.status != OutboxStatus.DEAD.value:
-            raise InvalidTransitionError("Only a terminal dead message can be re-driven.")
+            raise InvalidTransitionError(
+                "Only a terminal dead message can be re-driven."
+            )
 
         dispatch = session.scalar(
             select(Dispatch).where(Dispatch.id == dispatch_id).with_for_update()
