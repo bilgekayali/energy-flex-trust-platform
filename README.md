@@ -6,18 +6,20 @@
 [![License](https://img.shields.io/badge/license-Apache--2.0-blue.svg)](LICENSE)
 [![Python](https://img.shields.io/badge/python-3.11--3.13-3776AB.svg)](pyproject.toml)
 
-A secure, auditable reference platform for coordinating distributed energy
-flexibility—from asset registration and capacity reservation to durable dispatch
-publication, meter evidence and settlement proof.
+A secure, auditable production-reference platform for coordinating distributed
+energy flexibility—from asset registration and capacity reservation to durable
+dispatch publication, meter evidence and settlement proof.
 
 The project demonstrates how operational decisions can remain traceable and
 fail-closed when several organizations exchange data and trigger financially
 material actions. It uses synthetic/reference data and does not ship a credentialed
 live market, meter or physical-device transport.
 
-> **Status:** v0.9 release-candidate hardening on the path to v1.0. Package metadata
-> is staged at `0.9.0`, but no release tag or production-approval claim is implied
-> until the exact release gates are green and reviewed.
+> **Status:** v1.0 production-reference release candidate. Package/runtime metadata
+> is staged at `1.0.0`. A `v1.0.0` tag is permitted only after all release workflows
+> are green on one reviewed SHA, the approved commit is merged to `main`, and the
+> push-only provenance/SBOM attestations succeed. This status is not
+> institution-specific production approval.
 
 ## Summary
 
@@ -44,7 +46,8 @@ Energy Flex Trust makes the critical controls executable:
 - protocol mapping → schema validation → transport separation for future reviewed
   OpenADR 3 integration;
 - PostgreSQL recovery and least-privilege release gates;
-- SBOM, artifact digest, vulnerability analysis and build-attestation evidence.
+- SBOM, artifact digest, vulnerability analysis and build-attestation evidence;
+- explicit residual-risk disposition and stable v1 compatibility policy.
 
 ## Workflow
 
@@ -115,8 +118,8 @@ configured RS256/ES256 trust material, validates standard time/issuer/audience
 claims and resolves exactly one supported Energy Flex application role.
 
 OIDC application authorization and PostgreSQL process identities are separate
-controls. v0.9 defines distinct migrator, API, worker, recovery and auditor database
-roles; see [Least privilege](docs/LEAST_PRIVILEGE.md).
+controls. The reference grant matrix defines distinct migrator, API, worker,
+recovery and auditor database roles; see [Least privilege](docs/LEAST_PRIVILEGE.md).
 
 ## Reliable dispatch publication
 
@@ -152,7 +155,7 @@ anything itself.
 See [Outbox re-drive](docs/runbooks/OUTBOX_REDRIVE.md). Recovery is intentionally
 not exposed as a public `/v1` HTTP endpoint.
 
-## API surface
+## Stable v1 API surface
 
 | Method | Endpoint | Required role | Purpose |
 |---|---|---|---|
@@ -167,8 +170,9 @@ not exposed as a public `/v1` HTTP endpoint.
 | `GET` | `/v1/audit/verify` | `auditor` | Recalculate the full audit hash chain |
 | `GET` | `/v1/operations/outbox` | Auditor/operator | Read aggregate outbound delivery health |
 
-The v0.9 route set is snapshotted in `contracts/api-surface-v0.9.json` and enforced
-by CI. See [Compatibility](docs/COMPATIBILITY.md) for the broader data/API policy.
+The v1 route set is frozen in `contracts/api-surface-v1.json` and enforced by CI.
+API semantics, idempotency behavior, persisted evidence and legacy queue-drain rules
+are defined in [Compatibility](docs/COMPATIBILITY.md).
 
 ## Architecture
 
@@ -202,9 +206,9 @@ flowchart TB
 The repository deliberately does not ship the credentialed live publisher shown in
 the architecture. That boundary belongs to the deploying institution.
 
-## v0.9 release-candidate hardening
+## Production-reference hardening
 
-### PostgreSQL recovery
+### PostgreSQL recovery and least privilege
 
 `PostgreSQL Recovery Gate` runs on PostgreSQL 16 and 17. It applies migrations,
 seeds a deterministic full workflow, performs a custom-format dump, restores into an
@@ -213,43 +217,44 @@ head and published outbox state. It separately exercises empty-database migratio
 `upgrade -> downgrade -> upgrade` mechanics.
 
 The same gate verifies required and prohibited privileges for API, worker, recovery
-and auditor PostgreSQL identities. See [Recovery](docs/runbooks/RECOVERY.md).
+and auditor PostgreSQL identities. Runtime roles receive no general DDL or DELETE
+capability. Production credentials, PAM and secret distribution remain
+institution-owned controls.
 
-### Least privilege
+### Supply-chain and exact release evidence
 
-The reference grant matrix separates:
+Release Evidence builds the `1.0.0` wheel and hardened non-root container, produces
+an SPDX 2.3 runtime SBOM and SHA-256 evidence, and writes a machine-readable
+`RELEASE_RECORD.json` containing the exact source SHA, wheel/SBOM digests, container
+image ID and reproducible build epoch. Push builds additionally produce GitHub
+provenance and SBOM attestations.
 
-- schema migration / DDL;
-- normal API coordination DML;
-- outbox worker state transitions;
-- terminal recovery re-drive;
-- read-only audit verification.
-
-Runtime roles receive no general DDL or DELETE capability. Production credentials,
-PAM and secret distribution remain institution-owned controls.
-
-### Supply-chain evidence
-
-Release evidence builds the wheel and hardened non-root container, produces an SPDX
-2.3 runtime SBOM and SHA-256 file, and uploads release evidence. Push builds also
-produce GitHub artifact/SBOM attestations. Security gates include CodeQL
-security-extended analysis plus an installed-runtime vulnerability audit and
-`pip check`.
-
-Dependabot is configured for Python, Docker and GitHub Actions dependencies.
-
-### Hardened container reference
+Security gates include CodeQL security-extended analysis plus installed-runtime
+vulnerability audit and `pip check`. Dependabot is configured for Python, Docker and
+GitHub Actions dependencies.
 
 The Docker image is multi-stage and runs as UID/GID `10001:10001`. The hardened
 compose reference demonstrates read-only filesystems, dropped Linux capabilities,
-`no-new-privileges`, PID limits and explicit OIDC/database configuration.
+`no-new-privileges`, PID limits and explicit OIDC/database configuration. It does
+not start a production dispatch worker because no live credentialed transport is
+bundled.
 
-It intentionally does not start a production dispatch worker because no live
-credentialed transport is bundled.
+### Release governance
+
+The v1 release is governed by:
+
+- [v1 release checklist](docs/V1_RELEASE_CHECKLIST.md);
+- [v1 release decision](docs/V1_RELEASE_DECISION.md);
+- [residual-risk register](docs/RESIDUAL_RISK.md);
+- [compatibility policy](docs/COMPATIBILITY.md).
+
+Every residual risk R-01 through R-15 has an explicit reference-release disposition
+and accountable owner role. Institution-specific controls are transferred or kept
+out of scope rather than being falsely represented as closed.
 
 ## Trust and evidence boundaries
 
-v0.9 provides executable evidence for:
+v1.0 provides executable repository evidence for:
 
 - capacity/state/idempotency invariants;
 - separation of duties;
@@ -262,8 +267,8 @@ v0.9 provides executable evidence for:
 - exact migration revision;
 - PostgreSQL backup/restore integrity checks;
 - runtime DB privilege separation;
-- public API route stability;
-- package/container build evidence.
+- stable public API route contract;
+- package/container build evidence and artifact identity.
 
 It does **not** make the database immutable, make external effects exactly once or
 prove that local dispatch state equals a physical/market outcome. Signed checkpoints
@@ -296,6 +301,7 @@ requires.
 - [Key and credential rotation](docs/runbooks/KEY_ROTATION.md)
 - [Incident response](docs/runbooks/INCIDENT_RESPONSE.md)
 - [v1.0 release checklist](docs/V1_RELEASE_CHECKLIST.md)
+- [v1.0 release decision](docs/V1_RELEASE_DECISION.md)
 
 ## Test and release gates
 
@@ -308,15 +314,16 @@ Main CI runs Python 3.11, 3.12 and 3.13. Additional workflows gate PostgreSQL
 recovery/privileges, CodeQL/runtime dependency security and release evidence.
 
 The project treats `v1.0.0` as an evidence-gated production-reference release, not a
-version-number milestone. See [Roadmap](docs/ROADMAP.md) and
-[v1 release checklist](docs/V1_RELEASE_CHECKLIST.md).
+version-number milestone. The exact PR head must be reviewed and approved before
+merge; the `main` push must then produce successful provenance/SBOM attestations
+before tagging.
 
 ## Residual risk
 
-Known gaps are explicit in [RESIDUAL_RISK.md](docs/RESIDUAL_RISK.md), including
+Known gaps remain explicit in [RESIDUAL_RISK.md](docs/RESIDUAL_RISK.md), including
 live destination authentication/egress, tenant isolation, institution-owned KMS/HSM
 checkpoint custody, PAM-backed recovery identity, backup RPO/RTO, field-level data
-protection, gateway abuse controls and immutable action/base-image pinning policy.
+protection, gateway abuse controls and supply-chain pinning policy.
 
 A green CI run does not itself close those risks.
 

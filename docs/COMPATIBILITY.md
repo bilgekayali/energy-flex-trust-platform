@@ -1,93 +1,115 @@
-# Compatibility and upgrade policy
+# v1 compatibility and upgrade policy
 
-v0.9 makes the compatibility boundary explicit before the v1.0 public contract is
-frozen. This document describes what the reference implementation guarantees and
-what it deliberately does not.
+The v1.0 production-reference release freezes the repository's first stable public
+compatibility boundary. This document describes repository guarantees; it does not
+replace institution-specific deployment, safety or regulatory review.
 
 ## Public HTTP API
 
-The current `/v1` route set is recorded in
-`contracts/api-surface-v0.9.json` and enforced by CI.
+The approved v1 `/v1` route set is recorded in `contracts/api-surface-v1.json` and
+enforced by CI. The version reported by package metadata, `/health`, generated
+OpenAPI information and the release-evidence workflow must resolve to `1.0.0` on the
+release candidate.
 
-For v1.0 and later, the intended policy is:
+For the 1.x line:
 
-- additive fields/endpoints may be introduced in compatible minor releases when
-  existing clients can ignore them safely;
-- removing or renaming endpoints, changing required request fields, changing field
-  meaning/types, or weakening authorization semantics requires an explicit major
-  compatibility decision;
-- error codes and idempotency semantics are part of the behavioral contract even
-  when their exact human-readable message text is not;
-- administrative recovery capability is intentionally **not** exposed as a public
-  `/v1` HTTP endpoint.
+- additive optional fields/endpoints may be introduced in compatible minor releases
+  only when existing clients can safely ignore them;
+- removing or renaming endpoints, adding required request fields, changing field
+  meaning/types, changing idempotency semantics, or weakening authorization
+  semantics requires an explicit major compatibility decision;
+- error status codes and idempotency behavior are part of the behavioral contract
+  even when exact human-readable error text is not;
+- administrative recovery capability remains intentionally outside the public
+  `/v1` HTTP surface;
+- generated OpenAPI schemas and behavior tests must be reviewed alongside the route
+  snapshot before a compatible release is approved.
 
-The route snapshot is not a complete OpenAPI semantic-diff engine. v1.0 release
-review must also inspect generated OpenAPI schemas and behavior tests.
+The route snapshot is intentionally small and reviewable; it is not a substitute
+for semantic OpenAPI and behavior review.
 
 ## Database schema
 
 Managed application startup requires the **exact expected Alembic head revision**.
-The current reference implementation does not claim mixed-version application
-instances can safely operate against one database during a rolling schema change.
+The v1.0 reference does not claim mixed-version application instances can safely
+operate against one database during a rolling schema change.
 
 Reference deployment choreography:
 
 1. stop or drain writers according to the deployment plan;
-2. take and verify the required backup/checkpoint evidence;
+2. take and verify required backup/checkpoint evidence;
 3. apply Alembic migrations with the dedicated migrator identity;
-4. re-apply/review least-privilege grants for any new objects;
+4. re-apply/review least-privilege grants for new objects;
 5. start the new application release;
 6. verify managed-schema startup, audit chain and operations health;
 7. enable the institution-owned dispatch worker last.
 
-A downgrade on populated production data is not automatically safe merely because
-Alembic implements a `downgrade()` function. See the recovery runbook.
+A populated-database downgrade is not automatically safe merely because an Alembic
+`downgrade()` exists. The operator must choose application rollback, forward-fix or
+database restore based on the actual migration and recovery plan.
+
+## Supported upgrade sources
+
+v1.0 is tested against the versioned migration chain established by v0.2/v0.3 and
+the v0.9 release-candidate baseline. Because v1.0 introduces no new database
+revision beyond that validated chain, the managed-schema gate remains fail-closed at
+the existing expected head.
+
+Deployments skipping intermediate application versions must still apply every
+Alembic revision in order and follow the stop/drain choreography above.
 
 ## Outbox payloads
 
-v0.9 introduces `energy-flex-dispatch.v1` in newly queued dispatch payloads.
+New dispatch work uses `energy-flex-dispatch.v1`.
 
-To preserve upgrade safety, the v0.9 worker also accepts the exact legacy v0.3
-payload shape, which had no `schema_version`. This compatibility exists so work that
-was committed immediately before an upgrade can drain normally. Unknown versions or
-extra/missing fields fail closed.
+v1.0 **retains exact legacy v0.3 payload parsing** for pending work committed before
+an upgrade. Legacy payload support is part of the v1.0 upgrade contract and must not
+be removed in a 1.x release unless both conditions are met:
 
-The v1.0 release review must decide and document how long legacy v0.3 payload
-reading remains supported. Removing it requires proof that no supported upgrade path
-can leave those messages pending.
+1. supported upgrade paths prove no legacy payload can remain pending, or operators
+   are required to prove the queue is empty before upgrade; and
+2. the compatibility change is explicitly documented and tested.
+
+Unknown payload versions or malformed/extra/missing fields continue to fail closed.
 
 ## Idempotency
 
-Reservation, dispatch and settlement idempotency keys are persisted data. A release
-must not silently reinterpret an existing `(operation, key)` pair. Terminal dispatch
-re-drive deliberately retains the original key so downstream replay protection can
-remain effective.
+Reservation, dispatch and settlement idempotency keys are persisted behavioral
+contracts. A release must not reinterpret an existing `(operation, key)` pair.
+Terminal dispatch re-drive deliberately retains the original key so downstream
+replay protection can remain effective across recovery.
 
 ## Audit and evidence formats
 
-The audit hash-chain canonicalization and existing settlement evidence manifest
-fields are integrity-sensitive persisted contracts. A new format should be
-introduced with an explicit version rather than silently changing the meaning of an
-existing hash.
+Audit-chain canonicalization and existing settlement evidence manifest fields are
+integrity-sensitive persisted contracts. A new format must be introduced with an
+explicit version rather than silently changing the meaning of an existing hash.
 
-Settlement evidence currently declares `schema_version: 1.0`. Historical manifests
-must remain independently hash-verifiable after an application upgrade.
+Settlement evidence declaring `schema_version: 1.0` must remain independently
+hash-verifiable after any 1.x upgrade and after supported database restore paths.
 
 ## Python and PostgreSQL support
 
-v0.9 CI gates Python 3.11, 3.12 and 3.13 for the unit/reference test suite. The
-PostgreSQL recovery gate exercises PostgreSQL 16 and 17 using Python 3.12.
+v1.0 gates Python 3.11, 3.12 and 3.13 in the main test matrix. The PostgreSQL
+recovery gate exercises PostgreSQL 16 and 17 using the repository's deterministic
+migration, privilege and dump/restore checks.
 
-These are repository-tested reference paths, not a promise about every OS,
-extension, managed database service or proxy configuration.
+These are repository-tested reference paths, not a promise about every operating
+system, managed database service, extension or proxy configuration.
 
 ## Release rollback decision
 
-Before deploying a release, operators must know whether rollback means:
+Before deploying a release, operators must choose which rollback class applies:
 
 - application rollback without schema rollback;
 - forward-fix on the new schema; or
-- database restore from a pre-change backup.
+- database restore from verified pre-change backup.
 
-The choice must be based on the actual migration/data change, not selected during an
-incident by assumption.
+The decision must be made during release planning, not improvised during an
+incident.
+
+## Non-claims
+
+Stable v1 compatibility does not establish OpenADR certification, market
+acceptance, tenant isolation, safe physical dispatch, regulatory compliance or an
+institution-specific production approval.
