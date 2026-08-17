@@ -6,28 +6,30 @@ production deployment still requires institution-specific security architecture,
 market/operator integration, independent assurance, operational ownership and
 regulatory/legal applicability decisions.
 
-## v0.2 — Trust boundaries
+## v0.2 — Trust boundaries — complete
 
-- replace caller-asserted development identity with an optional fail-closed OIDC
-  verification boundary for non-development environments;
-- keep identity verification deterministic and testable by separating token
-  verification from role mapping;
-- introduce signed audit checkpoints so a previously published chain head can be
-  independently verified;
-- establish explicit schema/version compatibility and migration guidance;
-- preserve safe local development defaults and synthetic-only examples.
+- fail-closed OIDC verification boundary for non-development environments;
+- deterministic token verification and role mapping with pinned trust material;
+- signed audit checkpoints for independently retained chain-head evidence;
+- explicit schema/version compatibility with managed Alembic migrations;
+- safe local development defaults and synthetic-only examples.
 
-## v0.3 — Reliable integration
+## v0.3 — Reliable integration — implemented in PR #4
 
 - transactional outbox for dispatch publication;
-- bounded retry/idempotency semantics for external publication;
-- OpenADR 3 message mapping behind the existing dispatch port using official,
-  version-pinned schemas or contract fixtures;
-- contract tests that prove domain behavior does not depend on a live VEN/VTN;
-- structured operational metrics and health/readiness signals;
-- deterministic failure-injection scenarios for recovery testing.
+- queued/pending domain states until outbound acknowledgement is recorded;
+- bounded exponential retry, durable downstream idempotency and terminal failure;
+- lease expiry and deterministic crash-recovery behavior;
+- OpenADR 3 mapping/validation/transport boundary without a conformance claim;
+- contract tests that do not require a live VEN/VTN, market or device;
+- low-cardinality outbox health signals and deterministic failure injection;
+- migration revision `0002_reliable_outbox`.
 
-## v0.9 — Release-candidate hardening
+The gate is complete only after the exact release head is green in CI and the PR is
+reviewed/merged. See [Reliable integration](RELIABLE_INTEGRATION.md) for delivery
+semantics and residual risk.
+
+## v0.9 — Release-candidate hardening — next
 
 - PostgreSQL migration/rollback/backup-restore regression coverage;
 - service-account and least-privilege deployment guidance;
