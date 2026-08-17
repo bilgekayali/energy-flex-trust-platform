@@ -47,6 +47,21 @@ flowchart LR
 The main happy path is intentionally small enough to understand and strict enough
 to expose the trust decisions that are often hidden in integration code.
 
+## Visual operations dashboard
+
+The credential-free dashboard turns the trust model into an inspectable operations
+view. It includes healthy coordination, capacity stress, meter-evidence gap, and
+audit-tampering scenarios. Every value is synthetic and the dashboard is read-only:
+it never contacts the API, database, a market, meter, or physical asset.
+
+```bash
+python -m pip install -e ".[dashboard]"
+python app.py
+```
+
+Open `http://127.0.0.1:7860`. See the [dashboard guide](docs/DASHBOARD.md) for
+the scenario definitions and safety boundary.
+
 ## Quick start
 
 ### Local Python
@@ -184,10 +199,9 @@ and deliberate audit tampering.
 ## Roadmap
 
 - **v0.1:** transactional reference workflow, evidence chain, PostgreSQL deployment;
-- **v0.2:** versioned migrations, OIDC adapter, signed audit checkpoints, OpenADR 3
-  schema adapter and contract tests;
-- **v0.3:** synthetic multi-asset simulator, observability, failure injection, and a
-  read-only operations dashboard.
+- **v0.2:** credential-free operations dashboard, followed by versioned migrations,
+  OIDC adapter, signed audit checkpoints, and OpenADR 3 contract tests;
+- **v0.3:** synthetic multi-asset simulator, observability, and failure injection.
 
 ## Standards boundary
 
