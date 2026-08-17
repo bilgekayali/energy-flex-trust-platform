@@ -25,22 +25,10 @@ jobs:
           python -m pip install pip-audit==2.10.1
       - name: Verify installed dependency consistency
         run: python -m pip check
-      - name: Verify bounded advisory exception scope
-        run: |
-          python scripts/verify_advisory_exceptions.py
-          python - <<'PY'
-          from importlib import metadata
-
-          version = metadata.version("cryptography")
-          if not version.startswith("49."):
-              raise SystemExit(
-                  f"expected patched released cryptography 49.x, found {version}"
-              )
-          PY
+      - name: Verify advisory exception policy
+        run: python scripts/verify_advisory_exceptions.py
       - name: Audit installed runtime environment
-        run: >-
-          pip-audit --local --skip-editable
-          --ignore-vuln PYSEC-2026-3552
+        run: pip-audit --local --skip-editable
 
   codeql:
     runs-on: ubuntu-latest

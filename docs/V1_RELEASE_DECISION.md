@@ -31,8 +31,9 @@ The final pull-request head must have all of the following green on the **same S
    OIDC/OpenADR trust-boundary checks.
 2. PostgreSQL Recovery Gate — PostgreSQL 16 and 17 migration, least-privilege role
    matrix, deterministic dump/restore integrity and rollback probe.
-3. Security Gates — bounded advisory exception validation, `pip check`, runtime
-   dependency audit and CodeQL security-extended analysis.
+3. Security Gates — advisory-exception policy validation, `pip check`, runtime
+   dependency audit with no suppressed resolved advisory and CodeQL security-extended
+   analysis.
 4. Release Evidence — wheel `1.0.0`, SPDX 2.3 SBOM, SHA-256 evidence, hardened
    non-root/read-only container execution and uploaded `RELEASE_RECORD.json`.
 
@@ -59,8 +60,8 @@ The generated `RELEASE_RECORD.json` records:
 ## Residual-risk decision
 
 `RESIDUAL_RISK.md` is the authoritative register. Every R-01 through R-15 entry has
-an explicit `accepted`, `transferred` or `out_of_scope` disposition and accountable
-owner role. No item is silently marked closed because CI is green.
+an explicit `closed`, `accepted`, `transferred` or `out_of_scope` disposition and
+accountable owner role. No item is silently marked closed because CI is green.
 
 In particular:
 
@@ -72,9 +73,9 @@ In particular:
 - source dependency lockfile reproducibility, exact-schema stop/drain deployment and
   moving major-version GitHub Action/base-image references remain visible accepted
   repository-level residual risks;
-- the `cryptography` R-15 exception is temporary, narrow and expires 2026-09-30.
-  Introduction of the affected PKCS#7 decrypt APIs or expiry of the exception is a
-  release blocker.
+- R-15 is closed at the repository reference-release boundary by requiring
+  `cryptography>=50,<51`, removing the PYSEC-2026-3552 audit suppression and
+  retiring the temporary advisory exception.
 
 ## Approval boundary
 

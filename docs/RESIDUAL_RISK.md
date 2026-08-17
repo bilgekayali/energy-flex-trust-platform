@@ -24,10 +24,12 @@ Disposition values are `closed`, `accepted`, `transferred`, or `out_of_scope`.
 | R-12 | No claim that local dispatch state equals external physical/market outcome | At-least-once semantics, original idempotency key, terminal reconciliation/re-drive process | `transferred` | Deploying institution market/device operations owner | Authoritative destination reconciliation and physical/market safety controls must establish actual outcome. Local acknowledgement is not proof of physical execution. |
 | R-13 | Exact-schema startup limits rolling mixed-version deployments | Fail-closed Alembic revision gate, migration/recovery tests and documented deployment choreography | `accepted` | Repository maintainer | The v1 reference contract assumes stop/drain/migrate/start deployment for data-changing migrations and does not claim zero-downtime mixed-version rollout. Expand-contract migration is required before making that claim. |
 | R-14 | Supply-chain workflow actions referenced by version tags may move within the major release | GitHub-owned security/attestation actions, Dependabot update review and exact build evidence | `accepted` | Repository maintainer | v1.0 retains major-version action references as an explicit supply-chain residual risk. High-assurance deployments should pin reviewed action commit SHAs and base-image digests under their software-supply-chain policy. |
-| R-15 | `cryptography` PYSEC-2026-3552 remains reported until upstream 50.0.0 is released; affected PKCS#7 EnvelopedData decrypt APIs are outside the implemented platform surface | Dependency floor 49.x; bounded exception expires 2026-09-30; AST guard rejects affected decrypt APIs; runtime audit ignores only this advisory ID | `accepted` | Repository maintainer / security owner | Acceptance is temporary and scoped only to the unused affected API surface. The exception must be removed and the dependency upgraded when the upstream fixed release is available. Expiry or introduction of an affected API is a release blocker. |
+| R-15 | `cryptography` PYSEC-2026-3552 affected the previously permitted 49.x dependency line | Dependency floor is `cryptography>=50,<51`; runtime `pip-audit` runs without an advisory ignore; no active advisory exception remains | `closed` | Repository maintainer / security owner | Upstream `cryptography` 50.0.0 contains the fix for CVE-2026-69247/PYSEC-2026-3552. The repository no longer permits 49.x and no longer suppresses this advisory, so the reference-release exception is retired. |
 
 ## Release interpretation
 
+- `closed` means repository engineering evidence removes the stated reference-release
+  risk; it does not establish broader deployment security.
 - `accepted` means the stated residual risk remains visible and bounded for the
   repository's production-reference release; it is not a blanket production-risk
   acceptance for any institution.
@@ -39,9 +41,10 @@ Disposition values are `closed`, `accepted`, `transferred`, or `out_of_scope`.
 ## Security-advisory exception rule
 
 A security-advisory exception is not closure. `security/advisory-exceptions.json`
-contains temporary, expiring scope assertions; an expired exception is a CI failure.
-The exception for R-15 cannot be broadened to cover use of the affected PKCS#7
-decryption APIs.
+contains only temporary, expiring scope assertions when an exception is actually
+required; an expired exception or use of an exception's affected API is a CI failure.
+Resolved advisories must be removed from the exception document and from any audit
+ignore list once the fixed dependency is required.
 
 ## Non-claims
 

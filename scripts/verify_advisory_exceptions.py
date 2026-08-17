@@ -32,8 +32,10 @@ def _today() -> date:
 def validate() -> None:
     document = json.loads(EXCEPTIONS_PATH.read_text(encoding="utf-8"))
     exceptions = document.get("exceptions")
-    if not isinstance(exceptions, list) or not exceptions:
-        raise RuntimeError("Security exception document contains no exceptions.")
+    if not isinstance(exceptions, list):
+        raise RuntimeError(
+            "Security exception document must contain an exceptions list."
+        )
 
     symbols = _source_symbols()
     seen_ids: set[str] = set()
