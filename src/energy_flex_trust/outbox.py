@@ -12,7 +12,9 @@ from uuid import uuid4
 from sqlalchemy import and_, func, or_, select
 from sqlalchemy.orm import Session, sessionmaker
 
-from .models import Dispatch, OutboxMessage, utc_now
+from .audit import append_event as append_audit_event
+from .domain import DispatchStatus, ReservationStatus
+from .models import Dispatch, OutboxMessage, Reservation, utc_now
 from .ports import DispatchPublisher, DispatchSignal
 
 DISPATCH_TOPIC = "dispatch.publish"
@@ -164,7 +166,7 @@ class OutboxWorker:
                     dispatch_signal(claimed.payload),
                     idempotency_key=claimed.idempotency_key,
                 )
-            except Exception as exc:  # noqa: BLE001 - boundary captures adapter failure.
+            except Exception as exc:  # noqa: BLE001 - adapter boundary.
                 terminal = self._record_failure(claimed, exc)
                 if terminal:
                     dead += 1
@@ -234,6 +236,12 @@ class OutboxWorker:
                 message = session.get(OutboxMessage, claimed.id)
                 if message is None or message.locked_by != claimed.claim_token:
                     return False
+                dispatch = session.get(Dispatch, claimed.aggregate_id)
+                if dispatch is None:
+                    raise RuntimeError("Outbox dispatch aggregate no longer exists.")
+                reservation = session.get(Reservation, dispatch.reservation_id)
+                if reservation is None:
+                    raise RuntimeError("Dispatch reservation no longer exists.")
                 message.status = OutboxStatus.PUBLISHED.value
                 message.adapter_reference = reference
                 message.published_at = now
@@ -241,9 +249,22 @@ class OutboxWorker:
                 message.locked_by = None
                 message.last_error = None
                 message.updated_at = now
-                dispatch = session.get(Dispatch, claimed.aggregate_id)
-                if dispatch is not None:
-                    dispatch.adapter_reference = reference
+                dispatch.adapter_reference = reference
+                dispatch.status = DispatchStatus.ISSUED.value
+                reservation.status = ReservationStatus.DISPATCHED.value
+                append_audit_event(
+                    session,
+                    aggregate_type="dispatch",
+                    aggregate_id=dispatch.id,
+                    event_type="dispatch.published",
+                    actor_id=f"system:{self.worker_id}",
+                    correlation_id=claimed.idempotency_key,
+                    payload={
+                        "outbox_message_id": message.id,
+                        "adapter_reference": reference,
+                        "attempt": message.attempts,
+                    },
+                )
                 return True
 
     def _record_failure(self, claimed: ClaimedMessage, exc: Exception) -> bool:
@@ -253,14 +274,35 @@ class OutboxWorker:
                 message = session.get(OutboxMessage, claimed.id)
                 if message is None or message.locked_by != claimed.claim_token:
                     return False
-                message.last_error = (
-                    f"{type(exc).__name__}: {exc}"[:2000]
-                )
+                error_text = f"{type(exc).__name__}: {exc}"[:2000]
+                message.last_error = error_text
                 message.lease_expires_at = None
                 message.locked_by = None
                 message.updated_at = now
                 if message.attempts >= self.max_attempts:
                     message.status = OutboxStatus.DEAD.value
+                    dispatch = session.get(Dispatch, claimed.aggregate_id)
+                    if dispatch is not None:
+                        dispatch.status = DispatchStatus.REJECTED.value
+                        reservation = session.get(
+                            Reservation,
+                            dispatch.reservation_id,
+                        )
+                        if reservation is not None:
+                            reservation.status = ReservationStatus.CANCELLED.value
+                        append_audit_event(
+                            session,
+                            aggregate_type="dispatch",
+                            aggregate_id=dispatch.id,
+                            event_type="dispatch.delivery_failed",
+                            actor_id=f"system:{self.worker_id}",
+                            correlation_id=claimed.idempotency_key,
+                            payload={
+                                "outbox_message_id": message.id,
+                                "attempts": message.attempts,
+                                "error": error_text,
+                            },
+                        )
                     return True
                 message.status = OutboxStatus.PENDING.value
                 message.available_at = now + timedelta(
