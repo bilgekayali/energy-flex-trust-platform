@@ -11,7 +11,7 @@ from sqlalchemy.pool import StaticPool
 
 from .models import Base
 
-EXPECTED_SCHEMA_REVISION = "0001_initial_schema"
+EXPECTED_SCHEMA_REVISION = "0002_reliable_outbox"
 
 
 def build_engine(database_url: str) -> Engine:
