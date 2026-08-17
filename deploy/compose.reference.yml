@@ -1,0 +1,52 @@
+services:
+  migrate:
+    profiles: ["ops"]
+    build:
+      context: ..
+      args:
+        VERSION: "0.9.0"
+        VCS_REF: "${VCS_REF:-unknown}"
+    command: ["alembic", "upgrade", "head"]
+    environment:
+      DATABASE_URL: "${MIGRATOR_DATABASE_URL:?set MIGRATOR_DATABASE_URL}"
+    user: "10001:10001"
+    read_only: true
+    tmpfs:
+      - /tmp:rw,noexec,nosuid,size=32m
+    cap_drop: ["ALL"]
+    security_opt:
+      - no-new-privileges:true
+    pids_limit: 128
+
+  api:
+    build:
+      context: ..
+      args:
+        VERSION: "0.9.0"
+        VCS_REF: "${VCS_REF:-unknown}"
+    environment:
+      APP_ENV: production
+      AUTH_MODE: oidc
+      DATABASE_URL: "${API_DATABASE_URL:?set API_DATABASE_URL}"
+      OIDC_ISSUER: "${OIDC_ISSUER:?set OIDC_ISSUER}"
+      OIDC_AUDIENCE: "${OIDC_AUDIENCE:?set OIDC_AUDIENCE}"
+      OIDC_JWKS_JSON: "${OIDC_JWKS_JSON:?set OIDC_JWKS_JSON}"
+      OIDC_ROLE_CLAIM: "${OIDC_ROLE_CLAIM:-energy_flex_role}"
+      OIDC_SUBJECT_CLAIM: "${OIDC_SUBJECT_CLAIM:-sub}"
+    user: "10001:10001"
+    read_only: true
+    tmpfs:
+      - /tmp:rw,noexec,nosuid,size=64m
+    cap_drop: ["ALL"]
+    security_opt:
+      - no-new-privileges:true
+    pids_limit: 256
+    init: true
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:${API_PORT:-8000}:8000"
+
+# A production outbox worker is intentionally not declared here. The repository
+# ships no credentialed live dispatch transport. Production orchestration must
+# inject an institution-owned authenticated DispatchPublisher; the built-in no-op
+# worker now fails closed outside development/test.
