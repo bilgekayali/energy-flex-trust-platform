@@ -93,7 +93,9 @@ class CoordinationServiceTests(unittest.TestCase):
             NoopDispatchPublisher(),
         ).run_once(limit=1)
         self.assertEqual(result.published, 1)
-        self.session.expire_all()
+        self.session.refresh(reservation)
+        self.session.refresh(dispatch)
+        self.session.commit()
         return asset, offer, reservation, dispatch
 
     def test_complete_workflow_produces_verifiable_evidence(self) -> None:
