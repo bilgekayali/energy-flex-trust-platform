@@ -28,7 +28,24 @@ jobs:
       - name: Compile
         run: python -m compileall -q src tests migrations
       - name: Test
-        run: pytest
+        shell: bash
+        run: |
+          set -o pipefail
+          pytest 2>&1 | tee pytest.log
+      - name: Annotate pytest failure
+        if: failure()
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+
+          path = Path("pytest.log")
+          if path.exists():
+              lines = path.read_text(encoding="utf-8", errors="replace").splitlines()
+              text = "\n".join(lines[-120:])
+              text = text.replace("%", "%25")
+              text = text.replace("\r", "%0D").replace("\n", "%0A")
+              print(f"::error title=pytest failure::{text}")
+          PY
       - name: OIDC verifier network boundary
         run: |
           python - <<'PY'
