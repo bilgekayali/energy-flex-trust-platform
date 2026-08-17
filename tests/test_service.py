@@ -16,6 +16,8 @@ from energy_flex_trust.database import (
 from energy_flex_trust.domain import Actor, ActorRole, AssetStatus, FlexDirection
 from energy_flex_trust.errors import ConflictError, ForbiddenError
 from energy_flex_trust.models import Asset, AuditEvent
+from energy_flex_trust.outbox import OutboxWorker
+from energy_flex_trust.ports import NoopDispatchPublisher
 from energy_flex_trust.schemas import (
     AssetCreate,
     DispatchCreate,
@@ -86,6 +88,12 @@ class CoordinationServiceTests(unittest.TestCase):
             self.operator,
             "dispatch-001",
         )
+        result = OutboxWorker(
+            self.session_factory,
+            NoopDispatchPublisher(),
+        ).run_once(limit=1)
+        self.assertEqual(result.published, 1)
+        self.session.expire_all()
         return asset, offer, reservation, dispatch
 
     def test_complete_workflow_produces_verifiable_evidence(self) -> None:
@@ -129,7 +137,7 @@ class CoordinationServiceTests(unittest.TestCase):
         )
         verification = self.service.audit_verification(self.auditor)
         self.assertTrue(verification.valid)
-        self.assertEqual(verification.event_count, 6)
+        self.assertEqual(verification.event_count, 7)
 
     def test_reservation_idempotency_returns_same_resource(self) -> None:
         _asset, offer = self.create_asset_and_offer()
