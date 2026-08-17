@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "energy-flex-trust-platform"
-version = "0.1.0"
+version = "0.2.0"
 description = "A secure reference platform for auditable energy-flexibility coordination."
 readme = "README.md"
 requires-python = ">=3.11"
@@ -22,7 +22,9 @@ classifiers = [
   "Topic :: Security",
 ]
 dependencies = [
+  "cryptography>=45,<47",
   "fastapi>=0.115,<1",
+  "PyJWT>=2.10,<3",
   "psycopg[binary]>=3.2,<4",
   "sqlalchemy>=2.0,<3",
   "uvicorn[standard]>=0.34,<1",
