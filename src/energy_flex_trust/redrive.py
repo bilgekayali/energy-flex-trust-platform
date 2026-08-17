@@ -44,7 +44,9 @@ def authorize_dead_dispatch_redrive(
     require_role(actor, ActorRole.RECOVERY_OPERATOR)
     normalized_reason = " ".join(reason.split())
     if len(normalized_reason) < 12:
-        raise ValueError("A specific re-drive reason of at least 12 characters is required.")
+        raise ValueError(
+            "A specific re-drive reason of at least 12 characters is required."
+        )
 
     with session.begin():
         message = session.scalar(
@@ -57,7 +59,9 @@ def authorize_dead_dispatch_redrive(
         if message.topic != DISPATCH_TOPIC:
             raise ConflictError("Only dispatch outbox messages can be re-driven here.")
         if message.aggregate_id != dispatch_id:
-            raise ConflictError("Outbox message and dispatch identifiers do not match.")
+            raise ConflictError(
+                "Outbox message and dispatch identifiers do not match."
+            )
         if message.status != OutboxStatus.DEAD.value:
             raise InvalidTransitionError("Only a terminal dead message can be re-driven.")
 
