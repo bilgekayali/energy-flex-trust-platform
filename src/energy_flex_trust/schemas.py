@@ -143,6 +143,15 @@ class AuditVerificationRead(ApiModel):
     broken_sequence: int | None = None
 
 
+class OutboxHealthRead(ApiModel):
+    pending: int
+    processing: int
+    published: int
+    dead: int
+    due: int
+    oldest_pending_age_seconds: float | None
+
+
 class HealthRead(ApiModel):
     status: str
     version: str
