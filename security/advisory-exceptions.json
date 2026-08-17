@@ -1,16 +1,3 @@
 {
-  "exceptions": [
-    {
-      "id": "PYSEC-2026-3552",
-      "package": "cryptography",
-      "affected_api": [
-        "pkcs7_decrypt_der",
-        "pkcs7_decrypt_pem",
-        "pkcs7_decrypt_smime"
-      ],
-      "upstream_fix": "50.0.0",
-      "reason": "Upstream cryptography 50.0.0 is not released on PyPI as of 2026-08-17. Energy Flex Trust does not use PKCS#7 EnvelopedData decryption; CI rejects introduction of the affected APIs while this exception exists.",
-      "expires_on": "2026-09-30"
-    }
-  ]
+  "exceptions": []
 }
