@@ -13,7 +13,7 @@ RUN python -m pip wheel --no-deps --wheel-dir /wheels .
 
 FROM python:3.12-slim AS runtime
 
-ARG VERSION=0.9.0
+ARG VERSION=1.0.0
 ARG VCS_REF=unknown
 
 LABEL org.opencontainers.image.title="Energy Flex Trust Platform" \
