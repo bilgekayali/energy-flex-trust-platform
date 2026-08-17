@@ -28,10 +28,10 @@ Merged in PR #4. The implemented gate includes:
 
 See [Reliable integration](RELIABLE_INTEGRATION.md).
 
-## v0.9 — Release-candidate hardening — in progress
+## v0.9 — Release-candidate hardening — complete
 
-The v0.9 branch converts the v0.3 architecture into an independently reviewable
-release candidate by adding evidence around deployment, recovery and supply chain:
+Merged in PR #5. The v0.9 gate added independently reviewable deployment, recovery
+and supply-chain evidence:
 
 - PostgreSQL 16/17 migration, dump/restore and integrity regression gates;
 - CI-enforced least-privilege separation for migrator, API, worker, recovery and
@@ -47,26 +47,39 @@ release candidate by adding evidence around deployment, recovery and supply chai
 - explicit residual-risk register;
 - evidence-gated v1.0 release checklist.
 
-A `v0.9.0` tag is not implied by version metadata. The v0.9 gate is complete only
-when the exact PR head is green across all release workflows and the PR is reviewed
-and merged.
+## v1.0 — Production reference release — final gate
 
-## v1.0 — Production reference release
+The v1.0 branch is deliberately a narrow compatibility/evidence freeze rather than a
+new feature cycle. It stages `1.0.0` and must satisfy
+[V1 release checklist](V1_RELEASE_CHECKLIST.md) and
+[V1 release decision](V1_RELEASE_DECISION.md).
 
-After v0.9 merges, v1.0 should be a narrow release-hardening pass rather than a new
-feature cycle. The exact `v1.0.0` commit must satisfy
-[V1 release checklist](V1_RELEASE_CHECKLIST.md), including:
+The final release gate includes:
 
-1. supported Python and PostgreSQL paths;
-2. deterministic identity, authorization and idempotency behavior;
-3. migration, backup/restore and compatibility evidence;
-4. signed checkpoint verification and evidence integrity;
-5. outbound publication safety, replay and controlled re-drive boundaries;
-6. package/container SBOM, provenance, vulnerability and security-analysis gates;
-7. documented upgrade, rollback, key-rotation, recovery and incident procedures;
-8. explicit disposition of every residual risk;
-9. explicit non-claims for market certification, regulatory acceptance and live
-   physical-asset safety.
+1. stable package/runtime/OpenAPI/container version `1.0.0`;
+2. frozen public `/v1` route contract in `contracts/api-surface-v1.json`;
+3. supported Python 3.11/3.12/3.13 and PostgreSQL 16/17 gates;
+4. migration, backup/restore and compatibility evidence;
+5. signed checkpoint verification and evidence integrity;
+6. outbound publication safety, replay and controlled re-drive boundaries;
+7. package/container SBOM, provenance, vulnerability and security-analysis gates;
+8. machine-readable exact release record binding source SHA, wheel/SBOM digests and
+   container image identity;
+9. explicit disposition of every residual risk;
+10. explicit non-claims for market certification, regulatory acceptance and live
+    physical-asset safety.
+
+After the final PR is approved and merged, push-triggered provenance/SBOM
+attestations must succeed on the exact `main` commit before a `v1.0.0` tag is
+created.
+
+## Post-v1 maintenance
+
+The 1.x line should prioritize compatible security/reliability maintenance. Breaking
+API, persisted-data or idempotency semantics require an explicit major-version
+compatibility decision. The temporary `cryptography` advisory exception must be
+removed as soon as the upstream fixed release is available and cannot silently
+survive its expiry.
 
 ## Non-claims
 
