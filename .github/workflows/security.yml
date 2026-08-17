@@ -11,19 +11,22 @@ permissions:
   contents: read
 
 jobs:
-  dependency-review:
-    if: github.event_name == 'pull_request'
+  runtime-dependency-audit:
     runs-on: ubuntu-latest
-    permissions:
-      contents: read
     steps:
       - uses: actions/checkout@v7
-      - name: Review dependency changes
-        uses: actions/dependency-review-action@v4
+      - uses: actions/setup-python@v7
         with:
-          fail-on-severity: high
-          fail-on-scopes: runtime
-          retry-on-snapshot-warnings: true
+          python-version: "3.12"
+          cache: pip
+      - name: Install project and audit tool
+        run: |
+          python -m pip install .
+          python -m pip install pip-audit==2.10.1
+      - name: Verify installed dependency consistency
+        run: python -m pip check
+      - name: Audit installed runtime environment
+        run: pip-audit --local --skip-editable
 
   codeql:
     runs-on: ubuntu-latest
