@@ -44,6 +44,34 @@ jobs:
         run: alembic upgrade head
       - name: Seed deterministic recovery fixture
         run: python scripts/recovery_drill.py seed --output recovery-expected.json
+      - name: Create and verify least-privilege runtime roles
+        shell: bash
+        run: |
+          set -euo pipefail
+          docker run --rm --network host \
+            -e PGPASSWORD="$PGPASSWORD" \
+            "postgres:${{ matrix.postgres-version }}-alpine" \
+            psql \
+              --host 127.0.0.1 \
+              --username flextrust \
+              --dbname flextrust \
+              --set ON_ERROR_STOP=1 \
+              --command "CREATE ROLE flextrust_migrator NOLOGIN;" \
+              --command "CREATE ROLE flextrust_api LOGIN PASSWORD 'api-ci-only';" \
+              --command "CREATE ROLE flextrust_worker LOGIN PASSWORD 'worker-ci-only';" \
+              --command "CREATE ROLE flextrust_recovery LOGIN PASSWORD 'recovery-ci-only';" \
+              --command "CREATE ROLE flextrust_auditor LOGIN PASSWORD 'auditor-ci-only';"
+          docker run --rm --network host \
+            -e PGPASSWORD="$PGPASSWORD" \
+            -v "$PWD/deploy/postgres/least_privilege.sql:/work/grants.sql:ro" \
+            "postgres:${{ matrix.postgres-version }}-alpine" \
+            psql \
+              --host 127.0.0.1 \
+              --username flextrust \
+              --dbname flextrust \
+              --set ON_ERROR_STOP=1 \
+              --file /work/grants.sql
+          python scripts/verify_db_privileges.py --database flextrust
       - name: Dump primary database with matching PostgreSQL client
         shell: bash
         run: |
