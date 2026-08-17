@@ -37,7 +37,10 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     settings.validate_runtime()
     engine = build_engine(settings.database_url)
     session_factory = build_session_factory(engine)
-    initialize_database(engine)
+    initialize_database(
+        engine,
+        managed=settings.environment not in {"development", "test"},
+    )
 
     application = FastAPI(
         title="Energy Flex Trust Platform",
