@@ -21,7 +21,7 @@ live market, meter or physical-device transport.
 > push-only provenance/SBOM attestations succeed. This status is not
 > institution-specific production approval.
 
-## Why this project exists
+## Summary
 
 Energy-flexibility workflows cross organizational, protocol, identity, persistence
 and operational trust boundaries. Duplicate requests, conflicting roles, altered
