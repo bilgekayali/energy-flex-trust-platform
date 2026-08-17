@@ -6,8 +6,8 @@ Revises: none
 
 from __future__ import annotations
 
-from alembic import op
 import sqlalchemy as sa
+from alembic import op
 
 revision = "0001_initial_schema"
 down_revision = None
@@ -46,7 +46,12 @@ def upgrade() -> None:
         sa.ForeignKeyConstraint(["asset_id"], ["assets.id"], ondelete="RESTRICT"),
         sa.PrimaryKeyConstraint("id"),
     )
-    op.create_index("ix_flex_offers_asset_id", "flex_offers", ["asset_id"], unique=False)
+    op.create_index(
+        "ix_flex_offers_asset_id",
+        "flex_offers",
+        ["asset_id"],
+        unique=False,
+    )
 
     op.create_table(
         "reservations",
