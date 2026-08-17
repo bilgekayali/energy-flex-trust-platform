@@ -13,7 +13,7 @@ when several organizations exchange data and trigger financially material action
 It uses only synthetic data and its default dispatch adapter never contacts a live
 energy asset.
 
-> **Status:** v0.1 reference implementation. Not production-ready, OpenADR
+> **Status:** v0.2 reference implementation. Not production-ready, OpenADR
 > certified, or connected to an energy market or physical device.
 
 ## Why this project exists
@@ -27,9 +27,11 @@ Energy Flex Trust makes the critical controls executable:
 - idempotent reservation, dispatch, and settlement commands;
 - explicit state transitions and capacity checks;
 - role policy and settlement separation of duties;
+- fail-closed OIDC identity verification outside development/test;
 - deduplicated meter readings with deterministic fingerprints;
-- append-only, hash-linked audit events;
+- append-only, hash-linked audit events and signed audit checkpoints;
 - reproducible settlement evidence packages;
+- versioned database migrations for managed deployments;
 - a safe outbound adapter boundary for future OpenADR 3 integration.
 
 ## Workflow
@@ -85,13 +87,30 @@ docker compose up --build
 
 This starts PostgreSQL 16 and the API at `http://127.0.0.1:8000`.
 
-## Minimal API example
+### Managed schema
 
-Every protected request carries a development actor identity. These headers model
-policy behavior; they are **not authentication**. A production adapter must derive
-the actor and role from verified OIDC claims.
+Development and tests may create their local schema automatically. A
+non-development deployment must apply the versioned schema first:
 
-Register an asset:
+```bash
+export DATABASE_URL='postgresql+psycopg://...'
+alembic upgrade head
+```
+
+The application then verifies the exact expected migration revision at startup.
+
+## Identity boundary
+
+Local development/test requests can use `X-Actor-ID` and `X-Actor-Role` to exercise
+policy. These headers are **not authentication**. Any other environment fails
+closed unless `AUTH_MODE=oidc` is configured with an exact issuer, audience and
+institution-controlled JWKS document.
+
+The OIDC verifier never performs discovery or key retrieval over the network. It
+accepts only pinned RS256/ES256 keys, validates standard time/issuer/audience
+claims, and resolves exactly one Energy Flex role.
+
+Register an asset locally:
 
 ```bash
 curl -X POST http://127.0.0.1:8000/v1/assets \
@@ -104,23 +123,6 @@ curl -X POST http://127.0.0.1:8000/v1/assets \
     "asset_type": "battery",
     "capacity_kw": "100",
     "location_code": "GB-LON"
-  }'
-```
-
-Create an offer with the returned asset ID:
-
-```bash
-curl -X POST http://127.0.0.1:8000/v1/offers \
-  -H 'Content-Type: application/json' \
-  -H 'X-Actor-ID: owner-001' \
-  -H 'X-Actor-Role: asset_owner' \
-  -d '{
-    "asset_id": "<asset-id>",
-    "window_start": "2026-08-10T18:00:00Z",
-    "window_end": "2026-08-10T19:00:00Z",
-    "direction": "decrease",
-    "quantity_kw": "80",
-    "price_per_kwh": "0.50"
   }'
 ```
 
@@ -146,30 +148,36 @@ resource; reusing the key for a changed payload returns `409 Conflict`.
 
 ```mermaid
 flowchart TB
+    IdP[Institution identity provider]
     Client[Market participant or operator]
+    Auth[Pinned OIDC verification]
     API[FastAPI contracts and role boundary]
     Service[Transactional coordination service]
     Policy[State, capacity, idempotency and SoD invariants]
-    DB[(PostgreSQL / SQLite)]
+    DB[(Migrated PostgreSQL / local SQLite)]
     Audit[Hash-linked audit stream]
+    Checkpoint[Signed audit checkpoint]
     Port[Dispatch publisher port]
     Noop[Safe no-op adapter]
     Future[Future OpenADR 3 adapter]
 
-    Client --> API --> Service
+    IdP -. signed token .-> Client
+    Client --> Auth --> API --> Service
     Service --> Policy
     Service --> DB
     Service --> Audit --> DB
+    Audit -. verified head .-> Checkpoint
     Service --> Port
     Port --> Noop
     Port -. explicit future boundary .-> Future
 ```
 
 See [Architecture](docs/ARCHITECTURE.md),
-[API workflow](docs/API_WORKFLOW.md), and
-[Threat model](docs/THREAT_MODEL.md) for the detailed design and limitations.
+[API workflow](docs/API_WORKFLOW.md),
+[v0.2 trust boundaries](docs/TRUST_BOUNDARIES.md), and
+[Threat model](docs/THREAT_MODEL.md) for design details and limitations.
 
-## Trust guarantees in v0.1
+## Trust guarantees in v0.2
 
 - A reservation cannot exceed its offer.
 - A dispatch cannot exceed its reservation or escape the offer window.
@@ -180,10 +188,16 @@ See [Architecture](docs/ARCHITECTURE.md),
 - Evidence manifests are content-hashed and point to an audit-chain head.
 - Audit mutation, reordering, and non-tail deletion are detectable by full-chain
   verification.
+- Non-development runtimes cannot use caller-asserted actor headers.
+- OIDC tokens are verified against locally pinned trust material without discovery.
+- Managed deployments require the expected versioned database revision.
+- A valid audit head can be bound to an Ed25519-signed checkpoint for independent
+  retention or anchoring.
 
-The hash chain is tamper-evident, not tamper-proof. Tail truncation cannot be
-detected without a previously anchored head. Production-grade non-repudiation
-therefore requires signed checkpoints and an independently controlled anchor.
+The hash chain is tamper-evident, not tamper-proof. A signed checkpoint only helps
+detect later tail truncation if the checkpoint or its digest is retained outside
+the compromised persistence boundary. Production checkpoint private keys should be
+held behind an institution-owned KMS/HSM implementation of the signer protocol.
 
 ## Test
 
@@ -194,14 +208,23 @@ pytest
 
 Tests cover the complete workflow, replay behavior, changed-payload conflicts,
 separation of duties, suspended assets, meter deduplication, evidence verification,
-and deliberate audit tampering.
+deliberate audit tampering, OIDC verification, checkpoint tamper detection, and
+migration upgrade/downgrade behavior.
 
-## Roadmap
+## Roadmap to v1.0
 
-- **v0.1:** transactional reference workflow, evidence chain, PostgreSQL deployment;
-- **v0.2:** credential-free operations dashboard, followed by versioned migrations,
-  OIDC adapter, signed audit checkpoints, and OpenADR 3 contract tests;
-- **v0.3:** synthetic multi-asset simulator, observability, and failure injection.
+The project uses release gates rather than jumping directly from v0.x to a
+production claim:
+
+- **v0.2:** authenticated identity, signed audit checkpoints and managed migrations;
+- **v0.3:** transactional outbox, bounded outbound retries, OpenADR 3 contract
+  adapter/tests, observability and deterministic failure injection;
+- **v0.9:** migration/recovery hardening, least-privilege deployment, SBOM,
+  provenance, container/security gates and threat-model refresh;
+- **v1.0:** production-reference compatibility, upgrade/rollback contract and
+  independently reviewable release evidence.
+
+See the full [v1.0 release-gated roadmap](docs/ROADMAP.md).
 
 ## Standards boundary
 
@@ -209,6 +232,10 @@ OpenADR 3 is a future interoperability target, not a current compliance claim. T
 `DispatchPublisher` port isolates domain behavior from external protocols so an
 official-schema adapter and certification tests can be added without weakening the
 core transaction guarantees.
+
+The repository does not claim market participation approval, DORA/NIS2/ISO
+compliance, grid-code conformity, settlement acceptance, device security, or safe
+control of physical assets.
 
 ## License
 
