@@ -36,7 +36,8 @@ from .models import (
     Settlement,
     new_id,
 )
-from .ports import DispatchPublisher, DispatchSignal, NoopDispatchPublisher
+from .outbox import enqueue_dispatch
+from .ports import DispatchSignal
 from .schemas import (
     AssetCreate,
     DispatchCreate,
@@ -50,13 +51,8 @@ MONEY_QUANTUM = Decimal("0.000001")
 
 
 class CoordinationService:
-    def __init__(
-        self,
-        session: Session,
-        dispatch_publisher: DispatchPublisher | None = None,
-    ) -> None:
+    def __init__(self, session: Session) -> None:
         self.session = session
-        self.dispatch_publisher = dispatch_publisher or NoopDispatchPublisher()
 
     def register_asset(self, command: AssetCreate, actor: Actor) -> Asset:
         require_role(actor, ActorRole.ASSET_OWNER)
@@ -248,26 +244,29 @@ class CoordinationService:
                 target_kw=command.target_kw,
                 starts_at=command.starts_at,
                 ends_at=command.ends_at,
-                status=DispatchStatus.ISSUED.value,
+                status=DispatchStatus.QUEUED.value,
                 issued_by=actor.actor_id,
             )
             self.session.add(dispatch)
             self.session.flush()
-            dispatch.adapter_reference = self.dispatch_publisher.publish(
+            outbox = enqueue_dispatch(
+                self.session,
                 DispatchSignal(
                     dispatch_id=dispatch.id,
                     asset_external_id=asset.external_id,
                     target_kw=dispatch.target_kw,
                     starts_at=dispatch.starts_at,
                     ends_at=dispatch.ends_at,
-                )
+                ),
+                idempotency_key=idempotency_key,
             )
-            reservation.status = ReservationStatus.DISPATCHED.value
+            dispatch.adapter_reference = f"outbox:{outbox.id}"
+            reservation.status = ReservationStatus.DISPATCH_PENDING.value
             append_audit_event(
                 self.session,
                 aggregate_type="dispatch",
                 aggregate_id=dispatch.id,
-                event_type="dispatch.issued",
+                event_type="dispatch.queued",
                 actor_id=actor.actor_id,
                 correlation_id=idempotency_key,
                 payload={
@@ -275,7 +274,8 @@ class CoordinationService:
                     "target_kw": dispatch.target_kw,
                     "starts_at": dispatch.starts_at,
                     "ends_at": dispatch.ends_at,
-                    "adapter_reference": dispatch.adapter_reference,
+                    "outbox_message_id": outbox.id,
+                    "delivery_status": "queued",
                 },
             )
             self._store_idempotency(
@@ -359,13 +359,17 @@ class CoordinationService:
             reservation = self._reservation(reservation_id, for_update=True)
             if reservation.status != ReservationStatus.DISPATCHED.value:
                 raise InvalidTransitionError(
-                    "Only a dispatched reservation can be settled."
+                    "Only a delivered dispatch can be settled."
                 )
             dispatch = self.session.scalar(
                 select(Dispatch).where(Dispatch.reservation_id == reservation.id)
             )
             if not dispatch:
                 raise NotFoundError("No dispatch exists for the reservation.")
+            if dispatch.status != DispatchStatus.ISSUED.value:
+                raise InvalidTransitionError(
+                    "Settlement requires a successfully published dispatch."
+                )
             if actor.actor_id in {dispatch.issued_by, reservation.requested_by}:
                 raise ForbiddenError(
                     "Settlement requires an actor separate from reservation "
