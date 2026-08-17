@@ -1,15 +1,17 @@
-"""SQLAlchemy engine and session construction."""
+"""SQLAlchemy engine, schema and session construction."""
 
 from __future__ import annotations
 
 import sqlite3
 from collections.abc import Iterator
 
-from sqlalchemy import Engine, create_engine, event
+from sqlalchemy import Engine, create_engine, event, inspect, text
 from sqlalchemy.orm import Session, sessionmaker
 from sqlalchemy.pool import StaticPool
 
 from .models import Base
+
+EXPECTED_SCHEMA_REVISION = "0001_initial_schema"
 
 
 def build_engine(database_url: str) -> Engine:
@@ -39,13 +41,38 @@ def build_session_factory(engine: Engine) -> sessionmaker[Session]:
     return sessionmaker(bind=engine, expire_on_commit=False, class_=Session)
 
 
-def initialize_database(engine: Engine) -> None:
-    """Create the v0.1 schema.
+def _verify_managed_schema(engine: Engine) -> None:
+    inspector = inspect(engine)
+    table_names = set(inspector.get_table_names())
+    expected_tables = set(Base.metadata.tables)
+    missing = expected_tables - table_names
+    if "alembic_version" not in table_names:
+        raise RuntimeError(
+            "Managed database has no Alembic revision. Run 'alembic upgrade head'."
+        )
+    if missing:
+        names = ", ".join(sorted(missing))
+        raise RuntimeError(f"Managed database is missing required tables: {names}.")
+    with engine.connect() as connection:
+        revision = connection.scalar(text("SELECT version_num FROM alembic_version"))
+    if revision != EXPECTED_SCHEMA_REVISION:
+        raise RuntimeError(
+            "Managed database revision is incompatible: "
+            f"expected {EXPECTED_SCHEMA_REVISION}, found {revision!r}."
+        )
 
-    This is intentionally convenient for the reference implementation. A managed
-    deployment should replace it with versioned migrations before production use.
+
+def initialize_database(engine: Engine, *, managed: bool = False) -> None:
+    """Initialize a local schema or verify an operator-managed migrated schema.
+
+    Local development and tests may use SQLAlchemy ``create_all`` for convenience.
+    Non-development deployments must apply the versioned Alembic migration before
+    application startup and are verified fail-closed here.
     """
 
+    if managed:
+        _verify_managed_schema(engine)
+        return
     Base.metadata.create_all(engine)
 
 

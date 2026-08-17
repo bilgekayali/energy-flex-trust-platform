@@ -8,6 +8,7 @@ from fastapi.responses import JSONResponse
 from sqlalchemy.orm import Session
 
 from . import __version__
+from .auth import AuthenticationError, OidcVerifierConfig, verify_oidc_actor
 from .config import Settings
 from .database import build_engine, build_session_factory, initialize_database
 from .domain import Actor, ActorRole
@@ -33,9 +34,13 @@ from .service import CoordinationService
 
 def create_app(settings: Settings | None = None) -> FastAPI:
     settings = settings or Settings.from_environment()
+    settings.validate_runtime()
     engine = build_engine(settings.database_url)
     session_factory = build_session_factory(engine)
-    initialize_database(engine)
+    initialize_database(
+        engine,
+        managed=settings.environment not in {"development", "test"},
+    )
 
     application = FastAPI(
         title="Energy Flex Trust Platform",
@@ -57,9 +62,34 @@ def create_app(settings: Settings | None = None) -> FastAPI:
             session.close()
 
     def get_actor(
-        actor_id: Annotated[str, Header(alias="X-Actor-ID")],
-        actor_role: Annotated[ActorRole, Header(alias="X-Actor-Role")],
+        authorization: Annotated[
+            str | None,
+            Header(alias="Authorization"),
+        ] = None,
+        actor_id: Annotated[str | None, Header(alias="X-Actor-ID")] = None,
+        actor_role: Annotated[ActorRole | None, Header(alias="X-Actor-Role")] = None,
     ) -> Actor:
+        if settings.auth_mode == "oidc":
+            if authorization is None or not authorization.startswith("Bearer "):
+                raise AuthenticationError("A Bearer access token is required.")
+            token = authorization.removeprefix("Bearer ").strip()
+            if not token:
+                raise AuthenticationError("A Bearer access token is required.")
+            return verify_oidc_actor(
+                token,
+                OidcVerifierConfig(
+                    issuer=settings.oidc_issuer,
+                    audience=settings.oidc_audience,
+                    jwks_json=settings.oidc_jwks_json,
+                    role_claim=settings.oidc_role_claim,
+                    subject_claim=settings.oidc_subject_claim,
+                ),
+            )
+
+        if actor_id is None or actor_role is None:
+            raise AuthenticationError(
+                "Development actor headers X-Actor-ID and X-Actor-Role are required."
+            )
         return Actor(actor_id=actor_id, role=actor_role)
 
     SessionDependency = Annotated[Session, Depends(get_session)]

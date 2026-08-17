@@ -20,9 +20,31 @@ def test_health_reports_version() -> None:
     assert response.status_code == 200
     assert response.json() == {
         "status": "ok",
-        "version": "0.1.0",
+        "version": "0.2.0",
         "environment": "test",
     }
+
+
+def test_missing_development_identity_is_rejected() -> None:
+    app = create_app(
+        Settings(
+            database_url="sqlite+pysqlite:///:memory:",
+            environment="test",
+        )
+    )
+    with TestClient(app) as client:
+        response = client.post(
+            "/v1/assets",
+            json={
+                "external_id": "BATTERY-GB-API-NOAUTH",
+                "owner_id": "owner-api",
+                "asset_type": "battery",
+                "capacity_kw": "25",
+                "location_code": "GB-LON",
+            },
+        )
+    assert response.status_code == 401
+    assert response.json()["code"] == "authentication_failed"
 
 
 def test_role_policy_is_enforced_at_api_boundary() -> None:
