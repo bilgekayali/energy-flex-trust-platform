@@ -6,6 +6,8 @@ from fastapi.testclient import TestClient
 
 from energy_flex_trust.api import create_app
 from energy_flex_trust.config import Settings
+from energy_flex_trust.outbox import OutboxWorker
+from energy_flex_trust.ports import NoopDispatchPublisher
 
 
 def test_health_reports_version() -> None:
@@ -20,7 +22,7 @@ def test_health_reports_version() -> None:
     assert response.status_code == 200
     assert response.json() == {
         "status": "ok",
-        "version": "0.2.0",
+        "version": "0.3.0",
         "environment": "test",
     }
 
@@ -139,7 +141,14 @@ def test_complete_http_workflow_returns_verifiable_evidence() -> None:
             },
         )
         assert dispatch_response.status_code == 201
-        assert dispatch_response.json()["adapter_reference"].startswith("noop:")
+        assert dispatch_response.json()["status"] == "queued"
+        assert dispatch_response.json()["adapter_reference"].startswith("outbox:")
+
+        delivery = OutboxWorker(
+            app.state.session_factory,
+            NoopDispatchPublisher(),
+        ).run_once(limit=1)
+        assert delivery.published == 1
 
         reading_response = client.post(
             "/v1/meter-readings",
@@ -172,4 +181,4 @@ def test_complete_http_workflow_returns_verifiable_evidence() -> None:
         audit_response = client.get("/v1/audit/verify", headers=auditor)
         assert audit_response.status_code == 200
         assert audit_response.json()["valid"] is True
-        assert audit_response.json()["event_count"] == 6
+        assert audit_response.json()["event_count"] == 7
