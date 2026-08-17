@@ -24,7 +24,7 @@ classifiers = [
 ]
 dependencies = [
   "alembic>=1.14,<2",
-  "cryptography>=49,<50",
+  "cryptography>=49,<51",
   "fastapi>=0.115,<1",
   "PyJWT>=2.10,<3",
   "psycopg[binary]>=3.2,<4",
