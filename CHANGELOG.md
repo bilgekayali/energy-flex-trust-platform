@@ -26,6 +26,10 @@ All notable changes to this project will be documented in this file.
 - Runtime dependency audit, `pip check`, CodeQL security-extended analysis,
   Dependabot configuration, SPDX 2.3 SBOM, artifact SHA-256 and GitHub build/SBOM
   attestation workflow.
+- Raised `cryptography` to the released 49.x line after runtime audit findings.
+  PYSEC-2026-3552 remains an explicit temporary exception because its upstream fix
+  is 50.0.0, which is not yet released; CI expires the exception and forbids the
+  affected PKCS#7 EnvelopedData decrypt APIs while it exists.
 - Database recovery, terminal outbox re-drive, key/credential rotation and incident
   response runbooks.
 - Explicit least-privilege, compatibility and residual-risk documentation.
