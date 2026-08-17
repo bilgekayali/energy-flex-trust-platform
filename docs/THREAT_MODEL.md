@@ -2,151 +2,179 @@
 
 ## Scope
 
-This model covers the v0.3 coordination API, offline OIDC verification boundary,
-relational database and migration lifecycle, audit chain, signed checkpoint
-evidence, settlement evidence manifest, transactional dispatch outbox, bounded
-worker retry/lease behavior, OpenADR 3 contract boundary, low-cardinality
-operations endpoint, and read-only synthetic dashboard. The default outbound
-publisher remains a no-op; live grid devices and market integrations remain outside
-the current trust boundary.
+This model covers the v0.9 coordination API, offline OIDC verification boundary,
+managed PostgreSQL lifecycle, least-privilege process identities, audit chain,
+signed checkpoint evidence, settlement evidence, transactional dispatch outbox,
+bounded worker retry/lease behavior, controlled terminal re-drive, OpenADR 3
+contract boundary, release-evidence workflows and hardened reference container.
+
+A credentialed live market/device transport, institution IAM/PAM, external
+checkpoint custody and production network controls remain outside the repository's
+implemented trust boundary.
 
 ## Assets to protect
 
-- authority to reserve and dispatch capacity;
-- authenticated actor identity and effective Energy Flex role;
+- authority to reserve, dispatch and settle capacity;
+- authenticated actor identity and effective application role;
+- recovery/re-drive authority;
 - integrity of asset, offer, reading, dispatch and settlement data;
 - uniqueness and ordering of materially significant commands;
-- durable outbound idempotency and delivery state;
+- original idempotency identity across retry and re-drive;
 - provenance linking decisions to verified actors and inputs;
-- integrity and continuity of the audit event stream;
-- integrity of independently retained audit checkpoints;
-- database schema/version compatibility;
-- availability of the coordination, delivery and evidence services;
-- confidentiality of future commercially sensitive positions and readings.
+- integrity and continuity of the audit event stream and settlement evidence;
+- independently retained audit checkpoint evidence;
+- database schema/version and backup/restore compatibility;
+- build artifact, dependency and SBOM provenance;
+- availability of coordination, delivery and evidence services;
+- confidentiality of commercially sensitive positions/readings in a real deployment.
 
 ## Trust boundaries
 
-1. Institution identity provider to issued access token
-2. Client to offline pinned-JWKS verification
-3. Verified actor identity to API authorization policy
-4. Application transaction to database and transactional outbox
-5. Outbox worker claim/lease to outbound publisher
-6. Outbound publisher to future protocol transport / destination
-7. Operator-managed migration lifecycle to application startup
-8. Database event stream to audit verifier
-9. Verified audit head to checkpoint signer and external checkpoint retention
-10. Domain dispatch signal to OpenADR mapper and schema validator
-11. Platform to future market or device network
-12. Bundled synthetic fixture to read-only operations dashboard
+1. Institution identity provider → issued access token
+2. Client → offline pinned-JWKS verification
+3. Verified identity → application authorization policy
+4. API process identity → least-privilege PostgreSQL role
+5. Application transaction → database and transactional outbox
+6. Outbox worker DB identity → claim/finalization state
+7. Worker → institution-owned outbound publisher
+8. Publisher → mapping / authoritative-schema validation / transport
+9. Transport → external market/device destination
+10. Recovery operator/PAM process → dedicated recovery application and DB authority
+11. Operator-controlled migration identity → schema lifecycle
+12. Database → backup/restore system
+13. Database audit stream → verifier → checkpoint signer → external custody
+14. Source/dependencies → CI build → wheel/container/SBOM/attestation
+15. Synthetic fixtures → read-only dashboard
 
 ## STRIDE analysis
 
-| Threat | Example | v0.3 control | Residual risk / production control |
+| Threat | Example | v0.9 control/evidence | Residual production/institution control |
 |---|---|---|---|
-| Spoofing | Caller claims `market_operator` or forges a token | Non-development runtimes require OIDC; issuer/audience/signature/time claims and one exact role are verified against locally pinned keys | Upstream IdP compromise, account takeover, JWKS distribution error and entitlement lifecycle remain external controls |
-| Tampering | Reading, audit payload, migration state, checkpoint or queued outbound payload is altered | Meter fingerprints, evidence hashes, hash-linked audit events, signed checkpoints, managed revision checks and database transaction boundaries | A fully privileged application/DB compromise can rewrite data before independently retained evidence; backup, external anchoring and privileged-access monitoring remain required |
-| Repudiation | Operator denies issuing a dispatch or worker delivery | Verified subject, durable command idempotency, queued/published audit events and signed checkpoints provide traceable evidence | Does not prove the human behind a compromised account or external destination acknowledgement beyond the adapter reference |
-| Information disclosure | Competitor reads participant positions or queue payloads | Public operations endpoint exposes only aggregate low-cardinality counts; dashboard data is synthetic | Multi-tenant isolation, row-level authorization, encryption, secret management and access logging remain production work |
-| Denial of service | Request flood, DB outage, poison message or retry storm | Outbound work is decoupled from request latency; worker batch size, retry count, exponential backoff, max delay and terminal dead state are bounded | Gateway quotas, global rate limits, circuit breaking, SLOs, multi-instance capacity planning and production alerting remain required |
-| Elevation of privilege | Owner attempts settlement or token carries multiple roles | Closed role enum, separation of duties, exact OIDC role mapping and operations endpoint role checks | Entitlement approval/review, privileged operator separation and tenant-scoped authorization remain institution responsibilities |
+| Spoofing | Caller claims operator/recovery authority or presents forged token | Production-like API requires OIDC; exact issuer/audience/time/signature and one supported role against pinned keys; recovery has separate application/DB role | IdP compromise, MFA, entitlement lifecycle, PAM-backed recovery identity and secure JWKS distribution remain external |
+| Tampering | DB rows, queued payload, migration state, backup, audit/checkpoint or build artifact is altered | Hash/evidence verification, exact Alembic head, versioned payload parser, signed checkpoints, dump/restore verification, artifact SHA-256/SBOM/attestation | Fully privileged compromise, backup immutability, external checkpoint custody and protected artifact registry remain institution controls |
+| Repudiation | Operator denies dispatch/re-drive/settlement | Verified subject for API operations; durable idempotency; audit events for queued/published/failed/re-drive; signed checkpoint evidence | Compromised human account/PAM or destination acknowledgment cannot be disproved solely by local evidence |
+| Information disclosure | Participant reads another participant or queue/error data | Operations endpoint exposes aggregate counts; DB process roles are separated; dashboard synthetic | Tenant isolation/RLS, encryption, logging, data classification and secret management remain deployment-specific |
+| Denial of service | Request flood, DB outage, poison message, retry storm, restore failure | Bounded worker batch/retry/delay, terminal dead state, decoupled request/outbound path, PostgreSQL restore drill | Gateway quotas/WAF, circuit breaking, SLOs, capacity/failover planning and production alerting remain required |
+| Elevation of privilege | API/worker/recovery process attempts unrelated DB action | CI-verified PostgreSQL role matrix; no general runtime DDL/DELETE; recovery role scoped to re-drive state | DB owner/superuser/PAM governance, host/container escape prevention and tenant-scoped authorization remain external |
 
-## Outbound delivery abuse and failure cases
+## Key abuse and failure cases
 
 ### Duplicate external delivery
 
-v0.3 is intentionally at-least-once. A worker can publish successfully and crash
-before committing local success. After lease expiry another worker can replay the
-message. The durable API `Idempotency-Key` is carried into the publisher contract.
-Production transports must map it to a destination-side deduplication mechanism;
-without that, duplicate external effects remain possible.
+Delivery is intentionally at least once. A publish can succeed immediately before
+local finalization is lost. Lease expiry can then replay the message. The original
+idempotency key is preserved through normal retries and authorized terminal
+re-drive. A production destination must provide authoritative deduplication; without
+it duplicate external effects remain possible.
 
-### Worker crash or abandoned claim
+### Production no-op false success
 
-A claimed message has a unique claim token and lease expiry. A processing message
-can be reclaimed only after lease expiry. PostgreSQL row locking with `SKIP LOCKED`
-is the intended concurrent-worker primitive; SQLite is not presented as a
-production multi-worker concurrency guarantee.
+The reference `NoopDispatchPublisher` can acknowledge without contacting an
+external destination, which is useful only for tests. v0.9 prevents the default
+worker from selecting it outside `development`/`test`. Production orchestration
+must inject an institution-owned publisher. This prevents an accidental reference
+adapter from being treated as a live delivery mechanism.
 
-### Poison message / persistent destination failure
+### Terminal re-drive abuse
 
-Retry is bounded. Exhaustion moves the message to `dead`, rejects the dispatch,
-cancels the reservation and records `dispatch.delivery_failed`. Settlement remains
-blocked. v0.3 does not automatically requeue a dead message; production recovery
-requires an accountable reconciliation/re-drive procedure with authorization and
-audit evidence.
+Blindly resetting a dead message can repeat a financially/physically material
+action. v0.9 requires `recovery_operator`, dedicated DB privileges, exact
+`dead/rejected/cancelled` state, a specific reason and a replay-risk acknowledgement
+in the reference CLI. Re-drive retains the original key and emits
+`dispatch.redrive_authorized`.
 
-### Malformed OpenADR document
+The CLI actor identifier is audit metadata, not proof of human identity. Production
+use still requires authenticated operator/PAM workflow and external destination
+reconciliation before authorization.
 
-Mapping and schema validation are separated from transport. The transport is not
-called when validation fails. Normative schema assets are not bundled or
-approximated by the repository; production integrations must use reviewed,
-version-pinned authoritative materials.
+### Payload format drift during upgrade
+
+v0.3 queued payloads were unversioned. v0.9 writes
+`energy-flex-dispatch.v1` but accepts only the exact legacy v0.3 shape as an upgrade
+compatibility path. Unknown versions/fields fail closed. Removal of legacy support
+requires evidence that supported upgrades cannot leave legacy work queued.
+
+### Database restore inconsistency
+
+A database that merely starts after restore may still have missing/corrupt evidence
+or delivery state. PostgreSQL 16/17 CI seeds a complete workflow, dumps/restores to
+an isolated database and compares settlement amount, evidence hash, audit count/head
+and published outbox state. Production backup encryption, retention and RPO/RTO are
+not established by this test.
+
+### Supply-chain compromise
+
+A vulnerable dependency, altered package or unsafe image can bypass application
+logic. v0.9 adds CodeQL security-extended analysis, installed-runtime dependency
+audit, `pip check`, SPDX runtime SBOM, SHA-256 release evidence, non-root/read-only
+container tests and push artifact/SBOM attestations.
+
+Remaining supply-chain risks include mutable action/base-image tag references,
+registry compromise and institution deployment tooling; these are tracked in the
+residual-risk register.
 
 ### Destination compromise / egress abuse
 
-The reference implementation contains no credentialed live transport. A production
-transport still requires destination authentication, TLS policy, strict egress
-allowlisting, timeout/body limits, SSRF-resistant configuration, secret isolation,
-certificate lifecycle management and emergency disable controls.
+The repository contains no credentialed live transport. Production integration
+still requires destination authentication, TLS/certificate policy, egress
+allow-listing, timeout/body limits, SSRF-resistant configuration, credential
+rotation and emergency stop controls.
 
-## Abuse and failure cases tested
+## Abuse and failure cases tested or release-gated
 
-- changed payload replayed with the same command idempotency key;
-- reservation or dispatch above authorized capacity;
-- dispatch outside the offered time window;
-- settlement before outbound dispatch acknowledgement;
-- settlement by the same identity that reserved/dispatched;
-- duplicate meter reading;
-- settlement without qualifying evidence;
-- offer from a suspended asset;
-- mutation of a committed audit payload;
-- OIDC token with a wrong audience;
-- OIDC token with an ambiguous or unsupported role;
-- non-development startup using caller-asserted development headers;
-- signed checkpoint whose chain head is modified after signing;
-- checkpoint signed by an untrusted key;
-- checkpoint attempt over an invalid audit chain;
-- managed application startup against an unmigrated or wrong-revision database;
-- migration upgrade and downgrade lifecycle;
-- transient publisher failure followed by bounded retry and success;
-- retry-budget exhaustion into fail-closed dead/rejected/cancelled states;
-- expired worker lease recovery;
-- operations endpoint authorization and low-cardinality output;
-- OpenADR schema rejection before transport;
-- downstream idempotency key preservation across the OpenADR contract boundary.
+- changed payload replay under the same command idempotency key;
+- capacity/window/state violations;
+- settlement before dispatch acknowledgement;
+- separation-of-duties violation;
+- duplicate meter reading and missing settlement evidence;
+- audit mutation and signed-checkpoint tampering;
+- invalid/ambiguous OIDC tokens and production development-header rejection;
+- mismatched/unmigrated managed database;
+- transient retry, terminal delivery failure and expired lease recovery;
+- outbox operations authorization and low-cardinality response;
+- OpenADR validation failure before transport;
+- production-like no-op worker rejection;
+- controlled terminal re-drive plus non-recovery-role denial;
+- original idempotency-key preservation across re-drive;
+- versioned and exact legacy outbox payload parsing;
+- public `/v1` route-surface contract;
+- PostgreSQL 16/17 dump/restore integrity;
+- PostgreSQL least-privilege required/denied grant matrix;
+- hardened non-root/read-only container execution;
+- CodeQL/runtime dependency and release-evidence workflows.
 
 ## Key custody and audit checkpoint boundary
 
-`Ed25519SoftwareSigner` exists to exercise the signing contract in tests and
-controlled reference deployments. It is not a recommendation to persist a
-production private key in the application or database. Production deployments
-should implement the signer protocol using institution-owned KMS/HSM or another
-segregated signing service.
+`Ed25519SoftwareSigner` remains a reference/test implementation of the signer
+contract. Production checkpoint private keys should be held behind an
+institution-owned KMS/HSM or segregated signing service.
 
-A valid checkpoint does not make the database immutable. Tail-truncation detection
-requires the checkpoint artifact or its digest to be retained outside the database
-and outside the same administrative compromise domain.
+Historical public verification keys must remain available for retained checkpoints.
+A valid checkpoint does not make the database immutable; tail-truncation detection
+requires independently retained evidence outside the database compromise domain.
 
-## Explicit non-goals in v0.3
+## Explicit non-goals / residual risks
 
-- protection against a fully compromised application, database, IdP and checkpoint
-  custody system acting together;
-- automatic OIDC discovery or remote JWKS retrieval;
-- tenant-level database row isolation or universal authorization policy;
-- production secret/key provisioning and rotation;
-- exactly-once outbound delivery;
-- automatic operator-approved re-drive of dead messages;
-- a credentialed live market/device transport;
-- market-specific baseline, tolerance, netting, settlement or dispute rules;
-- real-time device safety controls;
-- OpenADR conformance or certification;
-- DORA, NIS2, ISO, grid-code or market compliance certification;
-- legal admissibility or absolute non-repudiation of evidence.
+The complete engineering register is [RESIDUAL_RISK.md](RESIDUAL_RISK.md). Key
+non-goals include:
 
-## Next threat-model gate
+- protection against simultaneous compromise of application, DB owner, IdP,
+  checkpoint custody and deployment supply chain;
+- tenant-level row isolation/RLS;
+- repository-managed production secrets/PAM;
+- exactly-once external delivery;
+- credentialed live market/device transport;
+- production RPO/RTO or immutable backup guarantee;
+- in-process WAF/rate limiting or infrastructure SLOs;
+- field-level encryption for classified production data;
+- OpenADR certification/conformance;
+- DORA/NIS2/ISO/grid-code/market certification;
+- legal admissibility or absolute non-repudiation;
+- safe control of physical energy assets.
 
-v0.9 must revisit production deployment and recovery controls: PostgreSQL failure
-and restore testing, tenant isolation, service-account privileges, secret/key
-rotation, destination authentication, egress restrictions, alert thresholds,
-reconciliation/re-drive authorization, dependency/SBOM/provenance controls,
-container hardening, incident response and operator emergency-stop procedures.
+## v1.0 threat-model gate
+
+Before `v1.0.0`, every residual risk must have an explicit disposition and the exact
+release commit must satisfy [V1_RELEASE_CHECKLIST.md](V1_RELEASE_CHECKLIST.md).
+Production-reference status must not be presented as institution-specific security,
+safety, market or regulatory approval.

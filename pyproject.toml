@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "energy-flex-trust-platform"
-version = "0.3.0"
+version = "0.9.0"
 description = "A secure reference platform for auditable energy-flexibility coordination."
 readme = "README.md"
 requires-python = ">=3.11"
@@ -13,7 +13,7 @@ authors = [
   { name = "Bilge Kayali" },
 ]
 classifiers = [
-  "Development Status :: 3 - Alpha",
+  "Development Status :: 4 - Beta",
   "Framework :: FastAPI",
   "License :: OSI Approved :: Apache Software License",
   "Programming Language :: Python :: 3",
@@ -24,7 +24,7 @@ classifiers = [
 ]
 dependencies = [
   "alembic>=1.14,<2",
-  "cryptography>=45,<47",
+  "cryptography>=49,<50",
   "fastapi>=0.115,<1",
   "PyJWT>=2.10,<3",
   "psycopg[binary]>=3.2,<4",
@@ -52,6 +52,9 @@ energy_flex_trust = ["demo_data/*.json"]
 [tool.pytest.ini_options]
 addopts = "-q --strict-markers --cov=energy_flex_trust --cov-report=term-missing --cov-fail-under=85"
 testpaths = ["tests"]
+markers = [
+  "postgres: requires an explicitly configured PostgreSQL test database",
+]
 
 [tool.ruff]
 line-length = 88

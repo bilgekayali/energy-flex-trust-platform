@@ -1,0 +1,16 @@
+{
+  "contract_version": "energy-flex-public-api-surface.v1",
+  "release": "0.9.0",
+  "routes": [
+    {"method": "GET", "path": "/health"},
+    {"method": "POST", "path": "/v1/assets"},
+    {"method": "POST", "path": "/v1/offers"},
+    {"method": "POST", "path": "/v1/offers/{offer_id}/reservations"},
+    {"method": "POST", "path": "/v1/reservations/{reservation_id}/dispatches"},
+    {"method": "POST", "path": "/v1/meter-readings"},
+    {"method": "POST", "path": "/v1/reservations/{reservation_id}/settlements"},
+    {"method": "GET", "path": "/v1/settlements/{settlement_id}/evidence"},
+    {"method": "GET", "path": "/v1/audit/verify"},
+    {"method": "GET", "path": "/v1/operations/outbox"}
+  ]
+}

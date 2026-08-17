@@ -18,6 +18,17 @@ from .models import Dispatch, OutboxMessage, Reservation, utc_now
 from .ports import DispatchPublisher, DispatchSignal
 
 DISPATCH_TOPIC = "dispatch.publish"
+DISPATCH_PAYLOAD_VERSION = "energy-flex-dispatch.v1"
+LEGACY_DISPATCH_FIELDS = frozenset(
+    {
+        "dispatch_id",
+        "asset_external_id",
+        "target_kw",
+        "starts_at",
+        "ends_at",
+    }
+)
+VERSIONED_DISPATCH_FIELDS = LEGACY_DISPATCH_FIELDS | {"schema_version"}
 Clock = Callable[[], datetime]
 
 
@@ -63,9 +74,10 @@ def _as_utc(value: datetime) -> datetime:
 
 
 def dispatch_payload(signal: DispatchSignal) -> dict[str, object]:
-    """Serialize a dispatch signal into deterministic JSON-compatible data."""
+    """Serialize a dispatch signal into the current versioned payload."""
 
     return {
+        "schema_version": DISPATCH_PAYLOAD_VERSION,
         "dispatch_id": signal.dispatch_id,
         "asset_external_id": signal.asset_external_id,
         "target_kw": format(signal.target_kw, "f"),
@@ -75,17 +87,21 @@ def dispatch_payload(signal: DispatchSignal) -> dict[str, object]:
 
 
 def dispatch_signal(payload: dict[str, object]) -> DispatchSignal:
-    """Restore a validated dispatch signal from an outbox payload."""
+    """Restore a validated dispatch signal from current or v0.3 payloads.
 
-    required = {
-        "dispatch_id",
-        "asset_external_id",
-        "target_kw",
-        "starts_at",
-        "ends_at",
-    }
-    if set(payload) != required:
+    v0.3 messages had no explicit schema version. They remain readable so a deploy
+    can drain already-committed work after the v0.9 application upgrade. New
+    messages always carry ``energy-flex-dispatch.v1``. Unknown versions and shapes
+    fail closed.
+    """
+
+    fields = frozenset(payload)
+    if fields == VERSIONED_DISPATCH_FIELDS:
+        if payload.get("schema_version") != DISPATCH_PAYLOAD_VERSION:
+            raise ValueError("Dispatch outbox payload version is unsupported.")
+    elif fields != LEGACY_DISPATCH_FIELDS:
         raise ValueError("Dispatch outbox payload has an unexpected shape.")
+
     return DispatchSignal(
         dispatch_id=str(payload["dispatch_id"]),
         asset_external_id=str(payload["asset_external_id"]),

@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from fastapi.testclient import TestClient
 
+from energy_flex_trust import __version__
 from energy_flex_trust.api import create_app
 from energy_flex_trust.config import Settings
 from energy_flex_trust.outbox import OutboxWorker
@@ -22,7 +23,7 @@ def test_health_reports_version() -> None:
     assert response.status_code == 200
     assert response.json() == {
         "status": "ok",
-        "version": "0.3.0",
+        "version": __version__,
         "environment": "test",
     }
 

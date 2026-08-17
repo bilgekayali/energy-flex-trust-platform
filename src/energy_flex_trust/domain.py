@@ -51,6 +51,7 @@ class ActorRole(StrEnum):
     MARKET_OPERATOR = "market_operator"
     SETTLEMENT_ANALYST = "settlement_analyst"
     AUDITOR = "auditor"
+    RECOVERY_OPERATOR = "recovery_operator"
     SYSTEM = "system"
 
 
