@@ -1,0 +1,104 @@
+name: Release Evidence
+
+on:
+  push:
+    branches: [main]
+    tags: ["v*"]
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  release-evidence:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      id-token: write
+      attestations: write
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-python@v7
+        with:
+          python-version: "3.12"
+          cache: pip
+      - name: Derive reproducible build epoch
+        shell: bash
+        run: echo "SOURCE_DATE_EPOCH=$(git show -s --format=%ct HEAD)" >> "$GITHUB_ENV"
+      - name: Build wheel
+        shell: bash
+        run: |
+          set -euo pipefail
+          python -m pip install "build>=1,<2"
+          python -m build --wheel
+      - name: Resolve wheel path
+        id: artifact
+        shell: bash
+        run: |
+          set -euo pipefail
+          wheel="$(find dist -maxdepth 1 -type f -name '*.whl' -print -quit)"
+          test -n "$wheel"
+          echo "wheel=$wheel" >> "$GITHUB_OUTPUT"
+      - name: Generate SPDX 2.3 runtime SBOM
+        shell: bash
+        run: |
+          set -euo pipefail
+          python -m venv .sbom-venv
+          .sbom-venv/bin/python -m pip install --disable-pip-version-check \
+            "${{ steps.artifact.outputs.wheel }}"
+          .sbom-venv/bin/python scripts/generate_sbom.py \
+            --output dist/energy-flex-trust.spdx.json
+          .sbom-venv/bin/python - <<'PY'
+          import energy_flex_trust
+
+          if energy_flex_trust.__version__ != "0.9.0":
+              raise SystemExit(
+                  f"unexpected package version: {energy_flex_trust.__version__}"
+              )
+          PY
+      - name: Generate artifact digests
+        shell: bash
+        run: |
+          set -euo pipefail
+          (
+            cd dist
+            sha256sum ./*.whl energy-flex-trust.spdx.json > SHA256SUMS
+          )
+      - name: Build hardened container
+        shell: bash
+        run: |
+          set -euo pipefail
+          docker build \
+            --build-arg VERSION=0.9.0 \
+            --build-arg VCS_REF="$GITHUB_SHA" \
+            --tag "energy-flex-trust:${GITHUB_SHA}" \
+            .
+          test "$(docker inspect --format '{{.Config.User}}' "energy-flex-trust:${GITHUB_SHA}")" = "10001:10001"
+          docker run --rm \
+            --read-only \
+            --tmpfs /tmp:rw,noexec,nosuid,size=32m \
+            --cap-drop ALL \
+            --security-opt no-new-privileges:true \
+            "energy-flex-trust:${GITHUB_SHA}" \
+            python -c 'import energy_flex_trust; assert energy_flex_trust.__version__ == "0.9.0"'
+      - name: Upload release evidence
+        uses: actions/upload-artifact@v4
+        with:
+          name: release-evidence-${{ github.sha }}
+          path: |
+            dist/*.whl
+            dist/energy-flex-trust.spdx.json
+            dist/SHA256SUMS
+          if-no-files-found: error
+          retention-days: 30
+      - name: Attest wheel provenance
+        if: github.event_name == 'push'
+        uses: actions/attest@v4
+        with:
+          subject-path: ${{ steps.artifact.outputs.wheel }}
+      - name: Attest wheel SBOM
+        if: github.event_name == 'push'
+        uses: actions/attest@v4
+        with:
+          subject-path: ${{ steps.artifact.outputs.wheel }}
+          sbom-path: dist/energy-flex-trust.spdx.json
