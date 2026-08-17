@@ -4,6 +4,31 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+### v1.0 production-reference release
+
+- Staged package/runtime/OpenAPI/container version `1.0.0` without creating a tag
+  before exact-head release approval.
+- Frozen stable public `/v1` route contract in `contracts/api-surface-v1.json`.
+- Defined v1 compatibility policy for API behavior, idempotency, persisted evidence,
+  database migration choreography and legacy outbox queue draining.
+- Retained exact v0.3 legacy outbox payload parsing as part of the v1.0 upgrade
+  contract while new messages remain `energy-flex-dispatch.v1`.
+- Added machine-readable `RELEASE_RECORD.json` generation binding exact Git commit,
+  wheel SHA-256, SPDX SBOM SHA-256, hardened container image ID and reproducible
+  build epoch.
+- Dispositioned every residual risk R-01 through R-15 with accountable owner roles;
+  institution-specific controls remain transferred/out of scope rather than falsely
+  reported as closed.
+- Added explicit v1 release-decision governance requiring all release workflows to
+  be green on one reviewed SHA and push-only provenance/SBOM attestations after
+  merge.
+- Preserved the temporary, expiring `cryptography` PYSEC-2026-3552 exception while
+  upstream 50.0.0 remains unavailable; affected PKCS#7 decrypt APIs remain forbidden
+  by CI and the exception expires 2026-09-30.
+- Preserved explicit non-claims for OpenADR certification, market acceptance,
+  regulatory compliance, tenant isolation, exactly-once external effects and safe
+  physical-asset control.
+
 ### v0.9 release-candidate hardening
 
 - Staged package/runtime version `0.9.0` without creating a release tag.
