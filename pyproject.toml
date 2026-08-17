@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "energy-flex-trust-platform"
-version = "0.9.0"
+version = "1.0.0"
 description = "A secure reference platform for auditable energy-flexibility coordination."
 readme = "README.md"
 requires-python = ">=3.11"
@@ -13,7 +13,7 @@ authors = [
   { name = "Bilge Kayali" },
 ]
 classifiers = [
-  "Development Status :: 4 - Beta",
+  "Development Status :: 5 - Production/Stable",
   "Framework :: FastAPI",
   "License :: OSI Approved :: Apache Software License",
   "Programming Language :: Python :: 3",
