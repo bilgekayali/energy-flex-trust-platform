@@ -19,7 +19,7 @@ live market, meter or physical-device transport.
 > is staged at `0.9.0`, but no release tag or production-approval claim is implied
 > until the exact release gates are green and reviewed.
 
-## Why this project exists
+## Summary
 
 Energy-flexibility workflows cross organizational, protocol, identity, persistence
 and operational trust boundaries. Duplicate requests, conflicting roles, altered
