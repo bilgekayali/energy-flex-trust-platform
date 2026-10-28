@@ -21,6 +21,16 @@ live market, meter or physical-device transport.
 > push-only provenance/SBOM attestations succeed. This status is not
 > institution-specific production approval.
 
+## Executive overview — 30 seconds
+
+**Problem:** Multi-party energy-flexibility coordination requires provable authority, reliable dispatch intent, least-privilege access, recovery and auditable settlement evidence.
+
+**Reference solution:** A synthetic-data platform demonstrating transactional workflows, idempotency, a durable outbox, cryptographic audit evidence and explicit ownership of live-system integrations.
+
+**Inspect the work:** [Source code](src/) · [Automated tests](tests/) · [Operational runbooks](docs/runbooks/) · [CI workflows](.github/workflows/).
+
+**Status and limits:** v1.0 **production-reference release candidate**, not evidence of a deployed energy market, live device transport, certification or independently confirmed operational readiness. A production integration requires institution-owned adapters and controls.
+
 ## Summary
 
 Energy-flexibility workflows cross organizational, protocol, identity, persistence
